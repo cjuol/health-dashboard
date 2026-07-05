@@ -1,0 +1,5 @@
+doctrine:
+    dbal:
+        url: '%env(resolve:DATABASE_URL)%'
+        # Acceso vía DBAL contra el esquema SQL-first (schema.sql): las vistas
+        # v_steps_* ya encapsulan la regla "Garmin si hay, móvil si no".

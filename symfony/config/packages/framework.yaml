@@ -1,0 +1,13 @@
+framework:
+    secret: '%env(APP_SECRET)%'
+    http_method_override: false
+    session: true
+    messenger:
+        transports:
+            # 'sync' ejecuta el handler en la misma petición: funciona sin worker.
+            # Para informes de rangos muy largos, cambia el transporte a
+            # doctrine:// y arranca `php bin/console messenger:consume` (patrón
+            # asíncrono del spec original).
+            sync: 'sync://'
+        routing:
+            App\Message\GenerateReport: sync

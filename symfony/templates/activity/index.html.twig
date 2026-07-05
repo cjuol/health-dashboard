@@ -1,0 +1,51 @@
+{% extends 'base.html.twig' %}
+{% block title %}Actividades{% endblock %}
+
+{% block body %}
+<form class="inline panel" method="get">
+    <label>Desde <input type="date" name="desde" value="{{ from|date('Y-m-d') }}"></label>
+    <label>Hasta <input type="date" name="hasta" value="{{ to|date('Y-m-d') }}"></label>
+    <label>Tipo
+        <select name="tipo" style="background:var(--bg2); color:var(--fg); border:1px solid var(--border); border-radius:6px; padding:.45rem .6rem">
+            <option value="">Todos</option>
+            {% for t in types %}<option value="{{ t }}" {{ t == type ? 'selected' }}>{{ t }}</option>{% endfor %}
+        </select>
+    </label>
+    <button type="submit">Filtrar</button>
+</form>
+
+<div class="panel">
+    <h2>{{ activities|length }} sesiones</h2>
+    <table>
+        <tr>
+            <th>Fecha</th><th>Tipo</th><th>Sesión</th><th>Dur.</th><th>Dist.</th>
+            <th>Ritmo</th><th>FC med/máx</th><th>TE aer/ana</th><th>Carga</th><th>SWOLF</th><th>kcal</th>
+        </tr>
+        {% for a in activities %}
+        {% set isSwim = 'swim' in a.activity_type %}
+        <tr>
+            <td>{{ a.start_time|date('d/m H:i') }}</td>
+            <td>{{ a.is_strength ? '🏋' : (isSwim ? '🏊' : '🏃') }} {{ a.activity_type }}</td>
+            <td><a href="{{ path('activity_show', {id: a.activity_id}) }}" style="color:var(--blue)">{{ a.activity_name }}</a></td>
+            <td>{{ a.duration_s ? (a.duration_s / 60)|round ~ "'" : '—' }}</td>
+            <td>{{ a.distance_m ? (a.distance_m / 1000)|number_format(2, ',') ~ ' km' : '—' }}</td>
+            <td>{% if isSwim and a.distance_m > 0 and a.duration_s > 0 %}
+                {% set s100 = (a.duration_s / (a.distance_m / 100))|round %}
+                {{ (s100 // 60) }}:{{ '%02d'|format(s100 % 60) }} /100m
+                {% else %}—{% endif %}</td>
+            <td>{{ a.avg_hr ?? '—' }} / {{ a.max_hr ?? '—' }}</td>
+            <td>{{ a.te_aerobic ? a.te_aerobic|number_format(1, ',') : '—' }} / {{ a.te_anaerobic ? a.te_anaerobic|number_format(1, ',') : '—' }}</td>
+            <td>{{ a.training_load ? a.training_load|round : '—' }}</td>
+            <td>{{ a.swolf ? a.swolf|round : '—' }}</td>
+            <td>{{ a.calories ?? '—' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="11" class="muted">Sin sesiones en el rango.</td></tr>
+        {% endfor %}
+    </table>
+    <p class="muted" style="margin-bottom:0; font-size:.78rem">
+        TE = Training Effect (0–5): aeróbico / anaeróbico. Carga = training load de la sesión.
+        SWOLF = eficiencia en natación (menos es mejor).
+    </p>
+</div>
+{% endblock %}

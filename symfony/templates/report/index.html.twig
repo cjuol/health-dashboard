@@ -1,0 +1,43 @@
+{% extends 'base.html.twig' %}
+{% block title %}Informes{% endblock %}
+
+{% block body %}
+<div class="panel">
+    <h2>Generar informe para Alex</h2>
+    <form class="inline" method="post" action="{{ path('report_create') }}">
+        <label>Desde <input type="date" name="desde" required></label>
+        <label>Hasta <input type="date" name="hasta" required></label>
+        <label style="flex:1; min-width: 260px;">Notas para el entrenador (opcional)
+            <input type="text" name="notas" placeholder="Semana de turnos de mañana, molestia en hombro…">
+        </label>
+        <button type="submit">Generar PDF</button>
+    </form>
+    <p class="muted" style="margin-bottom:0">
+        El informe fusiona pasos Garmin + móvil, sueño, HRV, FC en reposo, peso,
+        actividades y series de fuerza del rango.
+    </p>
+</div>
+
+<div class="panel">
+    <h2>Informes generados</h2>
+    <table>
+        <tr><th>#</th><th>Rango</th><th>Notas</th><th>Estado</th><th>Creado</th><th></th></tr>
+        {% for r in reports %}
+        <tr>
+            <td>{{ r.id }}</td>
+            <td>{{ r.date_from|date('d/m/Y') }} → {{ r.date_to|date('d/m/Y') }}</td>
+            <td class="muted">{{ r.notes ?? '—' }}</td>
+            <td>
+                {% if r.status == 'complete' %}<span class="ok">listo</span>
+                {% elseif r.status == 'failed' %}<span class="err">error</span>
+                {% else %}<span class="warn">generando…</span>{% endif %}
+            </td>
+            <td class="muted">{{ r.created_at|date('d/m H:i') }}</td>
+            <td>{% if r.status == 'complete' %}<a href="{{ path('report_download', {id: r.id}) }}">Descargar</a>{% endif %}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="muted">Todavía no hay informes.</td></tr>
+        {% endfor %}
+    </table>
+</div>
+{% endblock %}

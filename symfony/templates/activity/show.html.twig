@@ -1,0 +1,80 @@
+{% extends 'base.html.twig' %}
+{% block title %}{{ a.activity_name }}{% endblock %}
+
+{% block body %}
+<div class="panel">
+    <h2 style="font-size:1.15rem">{{ a.is_strength ? '🏋' : (is_swim ? '🏊' : '🏃') }} {{ a.activity_name }}
+        <span class="muted" style="font-weight:400; font-size:.85rem">· {{ a.activity_type }} · {{ a.start_time|date('d/m/Y H:i') }}</span></h2>
+    <div class="cards" style="margin-bottom:0">
+        <div class="card"><div class="label">Duración</div><div class="value">{{ (a.duration_s / 60)|round }}'</div></div>
+        {% if a.distance_m %}<div class="card"><div class="label">Distancia</div><div class="value">{{ (a.distance_m / 1000)|number_format(2, ',') }} km</div></div>{% endif %}
+        {% if is_swim and a.distance_m > 0 %}
+        {% set s100 = (a.duration_s / (a.distance_m / 100))|round %}
+        <div class="card"><div class="label">Ritmo</div><div class="value">{{ (s100 // 60) }}:{{ '%02d'|format(s100 % 60) }}<span class="muted" style="font-size:.8rem"> /100m</span></div></div>
+        {% endif %}
+        <div class="card"><div class="label">FC med / máx</div><div class="value">{{ a.avg_hr ?? '—' }}<span class="muted" style="font-size:.9rem"> / {{ a.max_hr ?? '—' }}</span></div></div>
+        <div class="card"><div class="label">TE aer / ana</div><div class="value">{{ a.te_aerobic ? a.te_aerobic|number_format(1, ',') : '—' }}<span class="muted" style="font-size:.9rem"> / {{ a.te_anaerobic ? a.te_anaerobic|number_format(1, ',') : '—' }}</span></div>
+            {% if a.te_label %}<div class="muted" style="font-size:.72rem">{{ a.te_label|lower|replace({'_': ' '}) }}</div>{% endif %}</div>
+        {% if a.training_load %}<div class="card"><div class="label">Carga</div><div class="value">{{ a.training_load|round }}</div></div>{% endif %}
+        {% if a.cadence %}<div class="card"><div class="label">Cadencia</div><div class="value">{{ a.cadence|round }}</div></div>{% endif %}
+        {% if a.swolf %}<div class="card"><div class="label">SWOLF</div><div class="value">{{ a.swolf|round }}</div></div>{% endif %}
+        {% if a.calories %}<div class="card"><div class="label">kcal</div><div class="value">{{ a.calories }}</div></div>{% endif %}
+    </div>
+</div>
+
+{% if zones %}
+<div class="panel">
+    <h2>Tiempo en zonas de FC</h2>
+    {% set zc = {1: '#737c73', 2: '#8ba4b0', 3: '#8a9a7b', 4: '#c4b28a', 5: '#c4746e'} %}
+    <div style="display:flex; height:34px; border-radius:6px; overflow:hidden; margin-bottom:.6rem">
+        {% for z in zones %}{% if z.pct > 0 %}
+        <div title="Z{{ z.zone }}: {{ (z.secs_in_zone / 60)|round }} min ({{ z.pct }}%)"
+             style="width:{{ z.pct }}%; background:{{ zc[z.zone] }}; display:flex; align-items:center; justify-content:center; font-size:.72rem; color:var(--bg); font-weight:600">
+            {% if z.pct > 7 %}Z{{ z.zone }}{% endif %}</div>
+        {% endif %}{% endfor %}
+    </div>
+    <div class="muted" style="font-size:.78rem">
+        {% for z in zones %}Z{{ z.zone }}{% if z.low_bpm %} (≥{{ z.low_bpm }}){% endif %}: {{ (z.secs_in_zone / 60)|round }}' ({{ z.pct }}%){{ not loop.last ? ' · ' }}{% endfor %}
+    </div>
+</div>
+{% endif %}
+
+{% if splits %}
+<div class="panel">
+    <h2>Parciales</h2>
+    <table>
+        <tr><th>#</th><th>Dist.</th><th>Tiempo</th>{% if is_swim %}<th>Ritmo /100m</th><th>Brazadas</th><th>SWOLF</th>{% else %}<th>Ritmo</th>{% endif %}<th>FC med</th><th>FC máx</th></tr>
+        {% for s in splits %}
+        <tr>
+            <td>{{ s.split_order }}</td>
+            <td>{{ s.distance_m ? s.distance_m|round ~ ' m' : '—' }}</td>
+            <td>{{ s.duration_s ? ((s.duration_s // 60)) ~ ':' ~ '%02d'|format(s.duration_s % 60) : '—' }}</td>
+            {% if is_swim %}
+                <td>{% if s.distance_m > 0 and s.duration_s > 0 %}{% set p = (s.duration_s / (s.distance_m / 100))|round %}{{ (p // 60) }}:{{ '%02d'|format(p % 60) }}{% else %}—{% endif %}</td>
+                <td>{{ s.strokes ?? '—' }}</td>
+                <td>{{ s.swolf ? s.swolf|round : '—' }}</td>
+            {% else %}
+                <td>{% if s.avg_speed_mps > 0 %}{% set p = (1000 / s.avg_speed_mps)|round %}{{ (p // 60) }}:{{ '%02d'|format(p % 60) }} /km{% else %}—{% endif %}</td>
+            {% endif %}
+            <td>{{ s.avg_hr ?? '—' }}</td>
+            <td>{{ s.max_hr ?? '—' }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>
+{% endif %}
+
+{% if sets %}
+<div class="panel">
+    <h2>Series de fuerza</h2>
+    <table>
+        <tr><th>#</th><th>Ejercicio</th><th>Reps</th><th>Peso</th></tr>
+        {% for s in sets %}
+        <tr><td>{{ s.set_order }}</td><td>{{ s.exercise_name ?? '?' }}</td><td>{{ s.reps ?? '—' }}</td><td>{{ s.weight_kg ? s.weight_kg ~ ' kg' : 'corporal' }}</td></tr>
+        {% endfor %}
+    </table>
+</div>
+{% endif %}
+
+<p><a href="{{ path('activities') }}" style="color:var(--blue)">← Volver a actividades</a></p>
+{% endblock %}

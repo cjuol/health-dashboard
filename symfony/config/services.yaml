@@ -1,0 +1,15 @@
+parameters:
+    app.reports_dir: '%kernel.project_dir%/var/reports'
+
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+        bind:
+            string $reportsDir: '%app.reports_dir%'
+
+    App\:
+        resource: '../src/'
+        exclude:
+            - '../src/Kernel.php'
+            - '../src/Message/'

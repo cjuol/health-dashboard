@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<style>
+    /* Informe pensado para imprimir/enviar: claro, sobrio, denso en datos. */
+    @page { size: A4; margin: 18mm 15mm; @bottom-right { content: counter(page) " / " counter(pages); font-size: 8pt; color: #888; } }
+    body { font: 9.5pt/1.45 "Helvetica Neue", Arial, sans-serif; color: #2a2a2a; }
+    h1 { font-size: 16pt; margin: 0; }
+    h2 { font-size: 11pt; margin: 14pt 0 6pt; border-bottom: 1.5pt solid #8a9a7b; padding-bottom: 2pt; }
+    .meta { color: #666; font-size: 9pt; margin-top: 2pt; }
+    .resumen { display: flex; flex-wrap: wrap; gap: 6pt; margin-top: 8pt; }
+    .kpi { border: 0.8pt solid #ddd; border-radius: 4pt; padding: 5pt 8pt; min-width: 88pt; }
+    .kpi .l { font-size: 7pt; text-transform: uppercase; letter-spacing: .04em; color: #777; }
+    .kpi .v { font-size: 12pt; font-weight: 700; }
+    table { width: 100%; border-collapse: collapse; font-size: 8pt; margin-top: 4pt; }
+    th { background: #f0f2ee; text-align: left; padding: 3pt 4pt; border-bottom: 1pt solid #ccc; }
+    td { padding: 2.5pt 4pt; border-bottom: 0.5pt solid #e5e5e5; }
+    tr.no-goal td { color: #999; }
+    .fuerza { margin: 1pt 0 4pt 10pt; font-size: 7.5pt; color: #555; }
+    .notas { background: #f7f6f2; border-left: 3pt solid #c4b28a; padding: 6pt 8pt; margin-top: 6pt; white-space: pre-wrap; }
+    img.chart { width: 100%; margin-top: 6pt; }
+    .num { text-align: right; }
+</style>
+</head>
+<body>
+
+<h1>Informe de seguimiento — {{ atleta }}</h1>
+<div class="meta">
+    Para: {{ entrenador }} · Periodo: {{ rango.desde }} – {{ rango.hasta }} · Generado: {{ generado }}<br>
+    {% if mesociclo %}<strong>Mesociclo {{ mesociclo.numero }} — {{ mesociclo.objetivo }}</strong>
+    · Semana {{ mesociclo.semana_actual }} de {{ mesociclo.semanas_total }}
+    · Pauta: fuerza ×{{ mesociclo.fuerza_semana }}/sem, natación ×{{ mesociclo.natacion_semana }}/sem,
+    {{ "{:,.0f}".format(mesociclo.pasos_objetivo).replace(",", ".") }} pasos/día<br>{% endif %}
+    Pasos = fusión Garmin + móvil (Health Connect) sin doble conteo; el móvil cubre las horas sin reloj.
+</div>
+
+<h2>Resumen del periodo</h2>
+<div class="resumen">
+    <div class="kpi"><div class="l">Pasos / día</div><div class="v">{{ "{:,.0f}".format(resumen.media_pasos or 0).replace(",", ".") }}</div></div>
+    <div class="kpi"><div class="l">Días objetivo</div><div class="v">{{ resumen.dias_objetivo }}/{{ resumen.total_dias }}</div></div>
+    <div class="kpi"><div class="l">Sueño medio</div><div class="v">{{ resumen.media_sueno_h or "—" }} h</div></div>
+    <div class="kpi"><div class="l">Sleep score</div><div class="v">{{ resumen.media_sleep_score or "—" }}</div></div>
+    <div class="kpi"><div class="l">HRV media</div><div class="v">{{ resumen.media_hrv or "—" }} ms</div></div>
+    <div class="kpi"><div class="l">FC reposo</div><div class="v">{{ resumen.media_fc_reposo or "—" }}</div></div>
+    <div class="kpi"><div class="l">Peso</div><div class="v">{{ resumen.peso_inicio or "—" }} → {{ resumen.peso_fin or "—" }} kg</div></div>
+    <div class="kpi"><div class="l">Sesiones</div><div class="v">{{ resumen.n_actividades }} ({{ resumen.tiempo_total_min }} min)</div></div>
+</div>
+{% if resumen.actividades_por_tipo %}
+<div class="meta" style="margin-top:5pt">
+    Por tipo: {% for tipo, n in resumen.actividades_por_tipo.items() %}{{ tipo }} ×{{ n }}{{ ", " if not loop.last }}{% endfor %}
+</div>
+{% endif %}
+
+{% if semanas %}
+<h2>Semana a semana{% if mesociclo %} vs pauta{% endif %}</h2>
+<table>
+    <tr>
+        <th>Semana</th><th class="num">Pasos/día</th><th class="num">Días obj.</th>
+        <th class="num">Fuerza</th><th class="num">Natación</th>
+        <th class="num">Peso medio</th><th class="num">Δ peso</th>
+        <th class="num">Sueño</th><th class="num">HRV</th>
+    </tr>
+    {% for w in semanas %}
+    <tr>
+        <td>{{ w.inicio }}</td>
+        <td class="num">{{ "{:,.0f}".format(w.pasos_media).replace(",", ".") }}</td>
+        <td class="num">{{ w.dias_objetivo }}/{{ w.dias_datos }}</td>
+        <td class="num">{{ w.fuerza }}{% if mesociclo %}/{{ mesociclo.fuerza_semana }}{% endif %}</td>
+        <td class="num">{{ w.natacion }}{% if mesociclo %}/{{ mesociclo.natacion_semana }}{% endif %}{% if w.natacion_km %} ({{ w.natacion_km }} km){% endif %}</td>
+        <td class="num">{{ w.peso_medio or "—" }}</td>
+        <td class="num">{% if w.delta_peso is not none %}{{ "%+.2f"|format(w.delta_peso|float) }}{% else %}—{% endif %}</td>
+        <td class="num">{{ w.sleep_score or "—" }}</td>
+        <td class="num">{{ w.hrv or "—" }}</td>
+    </tr>
+    {% endfor %}
+</table>
+{% endif %}
+
+{% if grafica_pasos %}
+<h2>Pasos diarios vs objetivo</h2>
+<img class="chart" src="{{ grafica_pasos }}" alt="Pasos diarios">
+{% endif %}
+
+<h2>Detalle diario</h2>
+<table>
+    <tr>
+        <th>Día</th><th class="num">Pasos</th><th class="num">% obj.</th>
+        <th class="num">Sueño</th><th class="num">Score</th>
+        <th class="num">HRV</th><th>Estado HRV</th><th class="num">FC rep.</th><th class="num">Peso</th><th>⚑</th>
+    </tr>
+    {% for d in dias %}
+    <tr {% if not d.goal_met %}class="no-goal"{% endif %}>
+        <td>{{ d.day }}</td>
+        <td class="num">{{ "{:,.0f}".format(d.steps).replace(",", ".") }}</td>
+        <td class="num">{{ d.pct_goal }}%</td>
+        <td class="num">{{ d.sleep_h if d.sleep_h is not none else "—" }} h</td>
+        <td class="num">{{ d.sleep_score or "—" }}</td>
+        <td class="num">{{ d.hrv_ms or "—" }}</td>
+        <td>{{ d.hrv_status or "—" }}</td>
+        <td class="num">{{ d.resting_hr or "—" }}</td>
+        <td class="num">{{ d.weight_kg or "—" }}</td>
+        <td>{% if d.alerta %}<span style="color:#b0413e; font-weight:700">⚑</span>{% endif %}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+<div class="meta">⚑ = día de sesión con HRV degradada (low/unbalanced/poor) o sueño &lt; 6 h la noche previa — candidato a modular carga.</div>
+
+<h2>Sesiones de entrenamiento</h2>
+<table>
+    <tr>
+        <th>Fecha</th><th>Tipo</th><th>Sesión</th>
+        <th class="num">Min</th><th class="num">Km</th><th class="num">Ritmo</th><th class="num">FC med</th><th class="num">FC máx</th><th class="num">kcal</th>
+    </tr>
+    {% for a in actividades %}
+    <tr>
+        <td>{{ a.fecha }}</td><td>{{ a.tipo }}</td><td>{{ a.nombre }}</td>
+        <td class="num">{{ a.duracion_min or "—" }}</td>
+        <td class="num">{{ a.distancia_km or "—" }}</td>
+        <td class="num">{{ a.ritmo or "—" }}</td>
+        <td class="num">{{ a.fc_media or "—" }}</td>
+        <td class="num">{{ a.fc_max or "—" }}</td>
+        <td class="num">{{ a.kcal or "—" }}</td>
+    </tr>
+    {% if a.fuerza %}
+    <tr><td colspan="9" class="fuerza">
+        {% for s in a.fuerza %}{{ s.ejercicio or "?" }} {{ s.reps or "?" }}×{{ s.peso_kg or "pc" }}kg{{ " · " if not loop.last }}{% endfor %}
+    </td></tr>
+    {% endif %}
+    {% endfor %}
+</table>
+
+{% if notas %}
+<h2>Notas del atleta</h2>
+<div class="notas">{{ notas }}</div>
+{% endif %}
+
+</body>
+</html>

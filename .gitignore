@@ -1,0 +1,13 @@
+# Secretos: nunca al repo
+symfony/.env
+.env
+
+# Generados
+symfony/vendor/
+symfony/var/
+__pycache__/
+*.pyc
+
+# Ruido
+*.zip
+*.tar.gz

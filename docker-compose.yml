@@ -1,0 +1,51 @@
+# Stack completo del dashboard de salud.
+#   db      → PostgreSQL con el esquema (schema.sql + fixes + webapp.sql)
+#   web     → Symfony (dashboard + API de la app Android + informes)
+#   sidecar → FastAPI que renderiza los PDF (POST /render)
+# La ingesta de Garmin la hace tu sidecar existente (garmin_informe.py)
+# escribiendo en las tablas garmin_* de esta misma base de datos.
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: health
+      POSTGRES_PASSWORD: health
+      POSTGRES_DB: health
+      TZ: Europe/Madrid
+      PGTZ: Europe/Madrid
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Los .sql de db/ se ejecutan en orden alfabético SOLO en el primer arranque:
+      # 01_schema.sql (el original SIN los dos índices rotos), 02_fixes, 03_webapp.
+      - ./db:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  web:
+    build: ./symfony
+    env_file: ./symfony/.env
+    volumes:
+      - reports:/var/www/html/var/reports
+    ports:
+      - "127.0.0.1:8087:80"
+    depends_on:
+      - db
+      - sidecar
+
+  sidecar:
+    build: ./sidecar
+    environment:
+      TZ: Europe/Madrid
+      SIDECAR_TOKEN: ${SIDECAR_TOKEN:-secreto_compartido_con_el_sidecar}
+      PG_DSN: postgresql://health:health@db:5432/health
+      GARMIN_DAYS_BACK: "3"
+      GARMIN_SYNC_COOLDOWN_MIN: "30"
+    expose:
+      - "8000"
+    depends_on:
+      - db
+
+volumes:
+  pgdata:
+  reports:

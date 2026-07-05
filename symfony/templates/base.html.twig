@@ -1,0 +1,66 @@
+{# Base común: paleta Kanagawa Dragon, navegación mínima. #}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Salud{% endblock %} · cjuol</title>
+    <style>
+        :root {
+            --bg: #181616; --bg2: #1f1d1d; --panel: #282727; --border: #393836;
+            --fg: #c5c9c5; --muted: #737c73;
+            --green: #8a9a7b; --yellow: #c4b28a; --blue: #8ba4b0; --red: #c4746e;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0; background: var(--bg); color: var(--fg);
+            font: 15px/1.5 system-ui, -apple-system, sans-serif;
+        }
+        header {
+            display: flex; align-items: center; gap: 1.5rem;
+            padding: .8rem 1.5rem; background: var(--bg2); border-bottom: 1px solid var(--border);
+        }
+        header h1 { font-size: 1rem; margin: 0; color: var(--yellow); font-weight: 600; }
+        nav a { color: var(--muted); text-decoration: none; margin-right: 1rem; }
+        nav a:hover, nav a.active { color: var(--fg); }
+        main { max-width: 1100px; margin: 0 auto; padding: 1.5rem; }
+        .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .8rem; margin-bottom: 1.5rem; }
+        .card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: .9rem 1rem; }
+        .card .label { color: var(--muted); font-size: .78rem; text-transform: uppercase; letter-spacing: .05em; }
+        .card .value { font-size: 1.5rem; font-weight: 600; margin-top: .15rem; }
+        .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin-bottom: 1.2rem; }
+        .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; }
+        @media (max-width: 800px) { .grid2 { grid-template-columns: 1fr; } }
+        h2 { font-size: .95rem; color: var(--yellow); margin: 0 0 .8rem; }
+        table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+        th, td { text-align: left; padding: .4rem .5rem; border-bottom: 1px solid var(--border); }
+        th { color: var(--muted); font-weight: 500; }
+        input, textarea, button {
+            background: var(--bg2); color: var(--fg); border: 1px solid var(--border);
+            border-radius: 6px; padding: .45rem .6rem; font: inherit;
+        }
+        button { cursor: pointer; background: var(--green); color: var(--bg); border: 0; font-weight: 600; }
+        button:hover { filter: brightness(1.1); }
+        .muted { color: var(--muted); }
+        .ok { color: var(--green); } .warn { color: var(--yellow); } .err { color: var(--red); }
+        form.inline { display: flex; gap: .6rem; align-items: end; flex-wrap: wrap; }
+        form.inline label { display: flex; flex-direction: column; gap: .2rem; font-size: .8rem; color: var(--muted); }
+        .flash { padding: .6rem 1rem; border-radius: 6px; margin-bottom: 1rem; background: var(--panel); border: 1px solid var(--red); color: var(--red); }
+    </style>
+</head>
+<body>
+<header>
+    <h1>⛰ Salud — Garmin + móvil</h1>
+    <nav>
+        <a href="{{ path('dashboard') }}" class="{{ app.current_route == 'dashboard' ? 'active' }}">Dashboard</a>
+        <a href="{{ path('activities') }}" class="{{ app.current_route starts with 'activit' ? 'active' }}">Actividades</a>
+        <a href="{{ path('detail', {metric: 'pasos'}) }}" class="{{ app.current_route == 'detail' ? 'active' }}">Detalle</a>
+        <a href="{{ path('report_index') }}" class="{{ app.current_route starts with 'report' ? 'active' }}">Informes</a>
+    </nav>
+</header>
+<main>
+    {% for message in app.flashes('error') %}<div class="flash">{{ message }}</div>{% endfor %}
+    {% block body %}{% endblock %}
+</main>
+</body>
+</html>

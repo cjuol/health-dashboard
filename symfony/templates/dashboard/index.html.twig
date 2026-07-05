@@ -1,0 +1,211 @@
+{% extends 'base.html.twig' %}
+{% block title %}Dashboard{% endblock %}
+
+{% block body %}
+{# ---------- Semáforo de recuperación ---------- #}
+{% set tl_colors = {green: 'var(--green)', amber: 'var(--yellow)', red: 'var(--red)', off: 'var(--muted)'} %}
+<div class="panel" style="border-left: 6px solid {{ tl_colors[traffic.level] }}; display:flex; gap:1.2rem; align-items:center; flex-wrap:wrap;">
+    <strong style="font-size:1.05rem">{{ traffic.message }}</strong>
+    <span class="muted" style="margin-left:auto">
+        {% if traffic.hrv_ms %}HRV {{ traffic.hrv_ms }} ms ({{ traffic.hrv_status|lower }}, base {{ traffic.hrv_base }}){% endif %}
+        {% if traffic.sleep_h %} · Sueño {{ traffic.sleep_h }} h{% if traffic.sleep_score %}, score {{ traffic.sleep_score }}{% endif %}{% endif %}
+    </span>
+</div>
+
+{# ---------- Tarjetas con contexto ---------- #}
+<div class="cards">
+    <a class="card" href="{{ path('detail', {metric: 'pasos'}) }}" style="text-decoration:none; color:inherit">
+        <div class="label">Pasos hoy</div>
+        <div class="value">{{ cards.steps_today|number_format(0, ',', '.') }}</div>
+        <div style="background:var(--bg2); border-radius:4px; height:6px; margin-top:.5rem; overflow:hidden">
+            <div style="width:{{ cards.steps_pct }}%; height:100%; background:{{ cards.steps_pct >= 100 ? 'var(--green)' : 'var(--yellow)' }}"></div>
+        </div>
+        <div class="muted" style="font-size:.75rem; margin-top:.3rem">
+            {{ cards.steps_pct >= 100 ? 'objetivo cumplido' : 'faltan ' ~ (cards.steps_goal - cards.steps_today)|number_format(0, ',', '.') }}
+        </div>
+    </a>
+    <a class="card" href="{{ path('activities') }}" style="text-decoration:none; color:inherit">
+        <div class="label">Semana</div>
+        <div class="value" style="font-size:1.15rem; line-height:1.9">
+            <span class="{{ cards.week_strength >= cards.target_strength ? 'ok' : 'warn' }}">🏋 {{ cards.week_strength }}/{{ cards.target_strength }}</span><br>
+            <span class="{{ cards.week_swim >= cards.target_swim ? 'ok' : 'warn' }}">🏊 {{ cards.week_swim }}/{{ cards.target_swim }}</span>
+        </div>
+    </a>
+    <a class="card" href="{{ path('detail', {metric: 'cuerpo'}) }}" style="text-decoration:none; color:inherit">
+        <div class="label">Peso (tendencia)</div>
+        <div class="value">{{ cards.weight_trend ?? '—' }}<span class="muted" style="font-size:.9rem"> kg</span></div>
+        {% if cards.weight_delta is not null %}
+        <div class="muted" style="font-size:.78rem">
+            <span class="{{ cards.weight_delta <= 0 ? 'ok' : 'warn' }}">{{ cards.weight_delta > 0 ? '+' }}{{ cards.weight_delta|number_format(2, ',') }} kg/sem</span>
+        </div>
+        {% endif %}
+    </a>
+    <a class="card" href="{{ path('detail', {metric: 'carga'}) }}" style="text-decoration:none; color:inherit">
+        <div class="label">HRV anoche</div>
+        <div class="value">{{ traffic.hrv_ms ? traffic.hrv_ms ~ ' ms' : '—' }}</div>
+        <div class="muted" style="font-size:.78rem">base {{ traffic.hrv_base ?? '—' }}</div>
+    </a>
+    <a class="card" href="{{ path('detail', {metric: 'sueno'}) }}" style="text-decoration:none; color:inherit">
+        <div class="label">Sueño anoche</div>
+        <div class="value">{{ traffic.sleep_h ? traffic.sleep_h ~ ' h' : '—' }}</div>
+        <div class="muted" style="font-size:.78rem">score {{ traffic.sleep_score ?? '—' }}</div>
+    </a>
+</div>
+
+{# ---------- Banner de mesociclo ---------- #}
+{% if mesocycle %}
+<div class="panel" style="display:flex; gap:1.2rem; align-items:baseline; flex-wrap:wrap;">
+    <strong style="color: var(--yellow)">Mesociclo {{ mesocycle.id }} · {{ mesocycle.objective }}</strong>
+    {% if meso_week %}<span>Semana {{ meso_week.current }}/{{ meso_week.total }}</span>{% endif %}
+    <span class="muted">{{ mesocycle.date_from|date('d/m') }} → {{ mesocycle.date_to|date('d/m') }}</span>
+    <span class="muted" style="margin-left:auto">
+        App móvil: {{ sync['hc_app_last_sync'] is defined ? sync['hc_app_last_sync']|date('d/m H:i') : '—' }}
+        · Garmin: {{ sync['garmin_sidecar_last_run'] is defined ? sync['garmin_sidecar_last_run']|date('d/m H:i') : '—' }}
+    </span>
+</div>
+{% endif %}
+
+{# ---------- Resumen semanal ---------- #}
+<div class="panel">
+    <h2>Semana a semana vs pauta</h2>
+    <table>
+        <tr>
+            <th>Semana</th><th>Pasos/día</th><th>Días objetivo</th>
+            <th>Fuerza</th><th>Natación</th><th>Peso medio</th><th>Δ peso</th>
+            <th>Sueño</th><th>HRV</th>
+        </tr>
+        {% for w in weekly %}
+        {% set okF = mesocycle and w.strength_sessions >= mesocycle.strength_sessions_week %}
+        {% set okN = mesocycle and w.swim_sessions >= mesocycle.swim_sessions_week %}
+        <tr>
+            <td>{{ w.week_start|date('d/m') }}</td>
+            <td>{{ w.avg_steps|number_format(0, ',', '.') }}</td>
+            <td>{{ w.days_goal_met }}/{{ w.days_with_data }}</td>
+            <td class="{{ okF ? 'ok' : 'warn' }}">{{ w.strength_sessions }}{% if mesocycle %}/{{ mesocycle.strength_sessions_week }}{% endif %}</td>
+            <td class="{{ okN ? 'ok' : 'warn' }}">{{ w.swim_sessions }}{% if mesocycle %}/{{ mesocycle.swim_sessions_week }}{% endif %}
+                {% if w.swim_m > 0 %}<span class="muted">({{ (w.swim_m / 1000)|number_format(1, ',') }} km)</span>{% endif %}</td>
+            <td>{{ w.avg_weight ? w.avg_weight ~ ' kg' : '—' }}</td>
+            <td>{% if w.weight_delta is not null %}
+                <span class="{{ w.weight_delta <= 0 ? 'ok' : 'warn' }}">{{ w.weight_delta > 0 ? '+' }}{{ w.weight_delta|number_format(2, ',') }}</span>
+                {% else %}—{% endif %}</td>
+            <td>{{ w.avg_sleep_score ?? '—' }}</td>
+            <td>{{ w.avg_hrv_ms ? w.avg_hrv_ms ~ ' ms' : '—' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="9" class="muted">Sin semanas con datos.</td></tr>
+        {% endfor %}
+    </table>
+</div>
+
+{# ---------- Gráficas del bloque (30 días fijos) ---------- #}
+<p class="muted" style="margin:.2rem 0 .8rem">Últimos 30 días ({{ from|date('d/m') }} → {{ to|date('d/m') }}). Para otros rangos, usa las vistas de <a href="{{ path('detail', {metric: 'pasos'}) }}" style="color:var(--blue)">Detalle</a>.</p>
+
+<div class="grid2">
+    <div class="panel"><h2>Pasos por fuente y objetivo</h2><canvas id="chSteps"></canvas></div>
+    <div class="panel"><h2>Sueño: fases y score</h2><canvas id="chSleep"></canvas></div>
+    <div class="panel"><h2>HRV nocturna sobre banda base</h2><canvas id="chHrv"></canvas></div>
+    <div class="panel"><h2>Peso: diario y tendencia 7d</h2><canvas id="chWeight"></canvas></div>
+    <div class="panel"><h2>FC en reposo</h2><canvas id="chRhr"></canvas></div>
+    <div class="panel"><h2>Minutos de intensidad / semana</h2><canvas id="chIntensity"></canvas></div>
+</div>
+
+{# ---------- Últimas actividades ---------- #}
+<div class="panel">
+    <h2>Últimas actividades <a href="{{ path('activities') }}" style="float:right; font-size:.8rem; color:var(--blue)">ver todas →</a></h2>
+    <table>
+        <tr><th>Fecha</th><th>Tipo</th><th>Nombre</th><th>Dur.</th><th>Dist.</th><th>FC</th><th>TE aer.</th><th>Carga</th></tr>
+        {% for a in activities %}
+        <tr>
+            <td>{{ a.start_time|date('d/m H:i') }}</td>
+            <td>{{ a.is_strength ? '🏋' : (a.activity_type starts with 'lap_swim' or 'swim' in a.activity_type ? '🏊' : '🏃') }} {{ a.activity_type }}</td>
+            <td><a href="{{ path('activity_show', {id: a.activity_id}) }}" style="color:var(--blue)">{{ a.activity_name }}</a></td>
+            <td>{{ a.duration_s ? (a.duration_s / 60)|round ~ "'" : '—' }}</td>
+            <td>{{ a.distance_m ? (a.distance_m / 1000)|number_format(2, ',') ~ ' km' : '—' }}</td>
+            <td>{{ a.avg_hr ?? '—' }}</td>
+            <td>{{ a.te_aerobic ? a.te_aerobic|number_format(1, ',') : '—' }}</td>
+            <td>{{ a.training_load ? a.training_load|round : '—' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" class="muted">Sin actividades en el rango.</td></tr>
+        {% endfor %}
+    </table>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script>
+const S = {{ series|json_encode|raw }};
+const C = { green:'#8a9a7b', yellow:'#c4b28a', blue:'#8ba4b0', red:'#c4746e', muted:'#737c73', grid:'#393836', fg:'#c5c9c5',
+            deep:'#4a6d8c', light:'#8ba4b0', rem:'#8a9a7b', awake:'#c4746e' };
+Chart.defaults.color = C.fg;
+Chart.defaults.borderColor = C.grid;
+
+const days  = S.steps.map(r => r.day.slice(5));
+const byDay = (rows, key) => Object.fromEntries(rows.map(r => [r.day, r[key]]));
+const align = (rows, key) => { const m = byDay(rows, key); return S.steps.map(r => m[r.day] ?? null); };
+
+// 1) Pasos apilados por fuente + objetivo (una sola gráfica: cuánto y quién lo midió)
+new Chart(chSteps, { options: { scales: { x: { stacked: true }, y: { stacked: true } } }, data: {
+    labels: days,
+    datasets: [
+        { type: 'bar', label: 'Garmin', data: align(S.steps_source, 'garmin_steps').map(v => +v || 0), backgroundColor: C.blue },
+        { type: 'bar', label: 'Móvil',  data: align(S.steps_source, 'phone_steps').map(v => +v || 0), backgroundColor: C.yellow },
+        { type: 'line', label: 'Objetivo', data: S.steps.map(r => +r.daily_goal), borderColor: C.green,
+          pointRadius: 0, stepped: true, borderWidth: 2 },
+    ]}});
+
+// 2) Sueño: fases apiladas (h) + score — ejes FIJOS para que nunca se rompa la escala
+const ph = k => align(S.sleep, k).map(v => v ? +(v/3600).toFixed(2) : null);
+new Chart(chSleep, { options: { scales: {
+        x: { stacked: true },
+        y: { stacked: true, min: 0, max: 10, title: { display: true, text: 'horas' } },
+        y2: { position: 'right', min: 0, max: 100, grid: { display: false } } } }, data: {
+    labels: days,
+    datasets: [
+        { type: 'bar', label: 'Profundo', data: ph('deep_s'),  backgroundColor: C.deep },
+        { type: 'bar', label: 'Ligero',   data: ph('light_s'), backgroundColor: C.light },
+        { type: 'bar', label: 'REM',      data: ph('rem_s'),   backgroundColor: C.rem },
+        { type: 'bar', label: 'Despierto',data: ph('awake_s'), backgroundColor: C.awake },
+        { type: 'line', label: 'Score', data: align(S.sleep, 'score'), borderColor: C.yellow,
+          yAxisID: 'y2', pointRadius: 2, borderWidth: 2 },
+    ]}});
+
+// 3) HRV: banda base como área sombreada + puntos coloreados por estado
+const st = align(S.hrv, 'status');
+new Chart(chHrv, { type: 'line', data: {
+    labels: days,
+    datasets: [
+        { label: 'Base alta', data: align(S.hrv, 'baseline_high_ms'), borderColor: 'transparent',
+          backgroundColor: 'rgba(138,154,123,.15)', fill: '+1', pointRadius: 0 },
+        { label: 'Base baja', data: align(S.hrv, 'baseline_low_ms'), borderColor: 'transparent', pointRadius: 0 },
+        { label: 'HRV', data: align(S.hrv, 'last_night_avg_ms'), borderColor: C.green, borderWidth: 2,
+          pointRadius: 3, pointBackgroundColor: st.map(s =>
+              !s ? C.muted : (s.toUpperCase() === 'BALANCED' ? C.green : C.red)) },
+    ]}, options: { plugins: { legend: { labels: { filter: i => i.text === 'HRV' } } } }});
+
+// 4) Peso: diario + tendencia 7d
+const pesoDiario = align(S.body, 'weight_kg').map(v => v ? +v : null);
+const ma7 = pesoDiario.map((_, i) => {
+    const win = pesoDiario.slice(Math.max(0, i - 6), i + 1).filter(v => v !== null);
+    return win.length >= 3 ? +(win.reduce((a, b) => a + b, 0) / win.length).toFixed(2) : null;
+});
+new Chart(chWeight, { type: 'line', data: {
+    labels: days,
+    datasets: [
+        { label: 'kg (día)', data: pesoDiario, borderColor: C.muted, pointRadius: 2, borderWidth: 1, spanGaps: true },
+        { label: 'Tendencia 7d', data: ma7, borderColor: C.yellow, pointRadius: 0, borderWidth: 2.5, spanGaps: true },
+    ]}});
+
+// 5) FC reposo
+new Chart(chRhr, { type: 'line', data: {
+    labels: days,
+    datasets: [{ label: 'FC reposo', data: align(S.daily, 'resting_hr'), borderColor: C.red, pointRadius: 2, spanGaps: true }]}});
+
+// 6) Minutos de intensidad semanales (vigorosos ×2, criterio Garmin/OMS)
+new Chart(chIntensity, { type: 'bar', options: { scales: { x: { stacked: true }, y: { stacked: true } } }, data: {
+    labels: S.intensity.map(r => r.week_start.slice(5)),
+    datasets: [
+        { label: 'Moderados', data: S.intensity.map(r => +r.moderate), backgroundColor: C.blue },
+        { label: 'Vigorosos ×2', data: S.intensity.map(r => +r.vigorous2), backgroundColor: C.green },
+    ]}});
+</script>
+{% endblock %}
