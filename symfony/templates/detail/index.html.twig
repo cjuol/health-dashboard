@@ -63,7 +63,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <script>
-const D = {{ data|json_encode|raw }};
+const D = {{ data|json_encode(constant('JSON_HEX_TAG') b-or constant('JSON_HEX_APOS') b-or constant('JSON_HEX_AMP') b-or constant('JSON_HEX_QUOT'))|raw }};
 const M = '{{ metric }}';
 const C = { green:'#8a9a7b', yellow:'#c4b28a', blue:'#8ba4b0', red:'#c4746e', muted:'#737c73',
             deep:'#4a6d8c', light:'#8ba4b0', rem:'#8a9a7b', awake:'#c4746e' };

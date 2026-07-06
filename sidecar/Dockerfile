@@ -11,5 +11,12 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
+# Usuario sin privilegios para ejecutar el proceso (evita correr como root)
+RUN useradd --create-home --shell /usr/sbin/nologin sidecar \
+    && chown -R sidecar:sidecar /app
+ENV HOME=/app \
+    MPLCONFIGDIR=/app/.cache/matplotlib
+USER sidecar
+
 EXPOSE 8000
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]

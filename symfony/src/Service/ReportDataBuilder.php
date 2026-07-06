@@ -50,11 +50,15 @@ final class ReportDataBuilder
 
             $dias[] = [
                 'day' => $d,
-                'steps' => (int) $s['steps'],
-                'goal' => (int) $s['daily_goal'],
-                'pct_goal' => (float) $s['pct_goal'],
-                'goal_met' => (bool) $s['goal_met'],
-                'phone_buckets' => (int) $s['phone_buckets'], // horas cubiertas por el móvil (cocina)
+                // Sin step_goal vigente para el día (fresh install / días previos
+                // al primer registro) el LEFT JOIN LATERAL de v_steps_daily deja
+                // daily_goal/pct_goal/goal_met en NULL: coalesced a 0/false para
+                // que nunca llegue un null al payload del sidecar.
+                'steps' => (int) ($s['steps'] ?? 0),
+                'goal' => (int) ($s['daily_goal'] ?? 0),
+                'pct_goal' => (float) ($s['pct_goal'] ?? 0),
+                'goal_met' => (bool) ($s['goal_met'] ?? false),
+                'phone_buckets' => (int) ($s['phone_buckets'] ?? 0), // horas cubiertas por el móvil (cocina)
                 'sleep_h' => $sleepH,
                 'sleep_score' => $sleep[$d]['score'] ?? null,
                 'hrv_ms' => $hrv[$d]['last_night_avg_ms'] ?? null,
@@ -110,16 +114,16 @@ final class ReportDataBuilder
                 'semanas_total' => (int) ceil(((int) $start->diff($end)->format('%a') + 1) / 7),
                 'fuerza_semana' => (int) $mesocycle['strength_sessions_week'],
                 'natacion_semana' => (int) $mesocycle['swim_sessions_week'],
-                'pasos_objetivo' => (int) $mesocycle['steps_goal'],
+                'pasos_objetivo' => null !== $mesocycle['steps_goal'] ? (int) $mesocycle['steps_goal'] : null,
                 'notas' => $mesocycle['notes'],
             ];
         }
 
         $semanas = array_map(fn ($w) => [
             'inicio' => (new \DateTimeImmutable($w['week_start']))->format('d/m'),
-            'pasos_media' => (int) $w['avg_steps'],
-            'dias_objetivo' => (int) $w['days_goal_met'],
-            'dias_datos' => (int) $w['days_with_data'],
+            'pasos_media' => null !== $w['avg_steps'] ? (int) $w['avg_steps'] : null,
+            'dias_objetivo' => null !== $w['days_goal_met'] ? (int) $w['days_goal_met'] : null,
+            'dias_datos' => null !== $w['days_with_data'] ? (int) $w['days_with_data'] : null,
             'fuerza' => (int) $w['strength_sessions'],
             'natacion' => (int) $w['swim_sessions'],
             'natacion_km' => $w['swim_m'] > 0 ? round($w['swim_m'] / 1000, 1) : null,

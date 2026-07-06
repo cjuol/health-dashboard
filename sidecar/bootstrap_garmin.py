@@ -15,7 +15,9 @@ from datetime import datetime, timedelta, timezone
 import garth
 import psycopg
 
-PG_DSN = os.environ.get("PG_DSN", "postgresql://health:health@db:5432/health")
+PG_DSN = os.environ.get("PG_DSN")
+if not PG_DSN:
+    raise RuntimeError("Falta la variable de entorno PG_DSN (debe definirla docker-compose).")
 
 
 def main() -> None:

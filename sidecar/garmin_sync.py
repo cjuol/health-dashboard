@@ -22,6 +22,7 @@ import logging
 import os
 import sys
 from datetime import date, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 import garth
 import psycopg
@@ -29,8 +30,11 @@ import psycopg
 log = logging.getLogger("garmin_sync")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
-PG_DSN = os.environ.get("PG_DSN", "postgresql://health:health@db:5432/health")
+PG_DSN = os.environ.get("PG_DSN")
+if not PG_DSN:
+    raise RuntimeError("Falta la variable de entorno PG_DSN (debe definirla docker-compose).")
 DAYS_BACK = int(os.environ.get("GARMIN_DAYS_BACK", "3"))
+MADRID_TZ = ZoneInfo("Europe/Madrid")
 
 
 # ---------------------------------------------------------------------------
@@ -40,7 +44,7 @@ DAYS_BACK = int(os.environ.get("GARMIN_DAYS_BACK", "3"))
 def load_auth(conn: psycopg.Connection) -> None:
     row = conn.execute("SELECT oauth1_token FROM garmin_auth_token WHERE id = 1").fetchone()
     if row is None:
-        raise SystemExit("Sin token de Garmin: ejecuta primero bootstrap_garmin.py (MFA una sola vez).")
+        raise RuntimeError("Sin token de Garmin: ejecuta primero bootstrap_garmin.py (MFA una sola vez).")
     garth.client.loads(row[0])
 
 
@@ -113,19 +117,25 @@ def sync_daily(conn, day: date) -> None:
 
 
 def sync_steps_buckets(conn, day: date) -> None:
-    """Buckets de 15 min alineados a reloj. Solo steps > 0 (regla anti-cero)."""
+    """Buckets de 15 min alineados a reloj. Solo se INSERTAN buckets con steps > 0
+    (regla anti-cero: la API intradía rellena el día entero de ceros aunque no
+    lleves el reloj puesto). Los buckets que llegan a 0 no se insertan, pero si
+    ya existían en BD con steps > 0 se corrigen a 0 en una sola sentencia UPDATE
+    (Garmin puede revisar datos a la baja tras el primer fetch)."""
     d = day.isoformat()
     data = api(f"/wellness-service/wellness/dailySummaryChart/{display_name()}?date={d}")
     if not data:
         return
+    zero_starts = []
     for b in data:
         steps = b.get("steps") or 0
-        if steps <= 0:
-            continue
         start = _parse_gmt(b.get("startGMT"))
-        end = _parse_gmt(b.get("endGMT"))
         if start is None:
             continue
+        if steps <= 0:
+            zero_starts.append(start)
+            continue
+        end = _parse_gmt(b.get("endGMT"))
         conn.execute(
             """
             INSERT INTO garmin_steps_bucket (bucket_start, bucket_end, steps, activity_level)
@@ -135,6 +145,14 @@ def sync_steps_buckets(conn, day: date) -> None:
                 activity_level = EXCLUDED.activity_level, fetched_at = now()
             """,
             (start, end, int(steps), b.get("primaryActivityLevel")),
+        )
+    if zero_starts:
+        conn.execute(
+            """
+            UPDATE garmin_steps_bucket SET steps = 0, fetched_at = now()
+            WHERE bucket_start = ANY(%s) AND steps <> 0
+            """,
+            (zero_starts,),
         )
 
 
@@ -262,11 +280,32 @@ def sync_vo2max(conn, day: date) -> None:
 
 
 def sync_activities(conn, since: date) -> None:
-    """Actividades recientes + detalle de series de fuerza (solo API, no existe en HC)."""
-    activities = api("/activitylist-service/activities/search/activities?limit=50&start=0") or []
+    """Actividades recientes + detalle de series de fuerza (solo API, no existe en HC).
+
+    La API devuelve las actividades en orden descendente por fecha (la más
+    reciente primero); paginamos hacia atrás y paramos en cuanto una página
+    sale de la ventana de sincronización (o llega corta/vacía)."""
+    page_size = 50
+    max_pages = 20
+    activities: list = []
+    for page in range(max_pages):
+        start_index = page * page_size
+        batch = api(
+            f"/activitylist-service/activities/search/activities"
+            f"?limit={page_size}&start={start_index}"
+        ) or []
+        if not batch:
+            break
+        activities.extend(batch)
+        oldest_start = _parse_gmt(batch[-1].get("startTimeGMT"))
+        if len(batch) < page_size:
+            break
+        if oldest_start is not None and _to_madrid_date(oldest_start) < since:
+            break
+
     for a in activities:
         start = _parse_gmt(a.get("startTimeGMT"))
-        if start is None or start.date() < since:
+        if start is None or _to_madrid_date(start) < since:
             continue
         type_key = ((a.get("activityType") or {}).get("typeKey") or "").lower()
         is_strength = "strength" in type_key
@@ -277,10 +316,12 @@ def sync_activities(conn, since: date) -> None:
                                          avg_speed_mps, elevation_gain, is_strength, raw)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (activity_id) DO UPDATE SET
-                activity_name = EXCLUDED.activity_name, duration_s = EXCLUDED.duration_s,
+                activity_type = EXCLUDED.activity_type, activity_name = EXCLUDED.activity_name,
+                start_time = EXCLUDED.start_time, duration_s = EXCLUDED.duration_s,
                 distance_m = EXCLUDED.distance_m, avg_hr = EXCLUDED.avg_hr,
                 max_hr = EXCLUDED.max_hr, calories = EXCLUDED.calories,
-                raw = EXCLUDED.raw, updated_at = now()
+                avg_speed_mps = EXCLUDED.avg_speed_mps, elevation_gain = EXCLUDED.elevation_gain,
+                is_strength = EXCLUDED.is_strength, raw = EXCLUDED.raw, updated_at = now()
             """,
             (
                 a.get("activityId"),
@@ -452,6 +493,12 @@ def _parse_gmt(value):
     return None
 
 
+def _to_madrid_date(dt: datetime) -> date:
+    """Convierte un datetime tz-aware (UTC) a fecha local Europe/Madrid, para no
+    descartar actividades de madrugada por comparar fecha UTC con fecha local."""
+    return dt.astimezone(MADRID_TZ).date()
+
+
 def _grams_to_kg(value):
     return round(value / 1000.0, 2) if value else None
 
@@ -466,4 +513,8 @@ def _to_int(value):
 if __name__ == "__main__":
     # Uso: python garmin_sync.py [days_back]  → backfill: python garmin_sync.py 30
     back = int(sys.argv[1]) if len(sys.argv) > 1 else DAYS_BACK
-    run(days_back=back)
+    try:
+        run(days_back=back)
+    except RuntimeError as e:
+        log.error(str(e))
+        sys.exit(1)

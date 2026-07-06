@@ -11,7 +11,9 @@ existente (garmin_informe.py), no de este módulo.
 
 import base64
 import io
+import logging
 import os
+import secrets
 import threading
 
 import matplotlib
@@ -25,6 +27,8 @@ from pydantic import BaseModel
 from weasyprint import HTML
 
 SIDECAR_TOKEN = os.environ.get("SIDECAR_TOKEN", "")
+
+logger = logging.getLogger("sidecar")
 
 app = FastAPI(title="Sidecar de informes", docs_url=None, redoc_url=None)
 
@@ -53,10 +57,12 @@ def _grafica_pasos(dias: list) -> str | None:
     """Barras de pasos vs objetivo, devuelta como data-URI PNG para el HTML."""
     if not dias:
         return None
-    etiquetas = [d["day"][5:] for d in dias]  # MM-DD
-    pasos = [d["steps"] for d in dias]
-    metas = [d["goal"] for d in dias]
-    colores = ["#8a9a7b" if d["goal_met"] else "#a6a69c" for d in dias]
+    # .get() con defaults: dias no está validado (RenderPayload.dias es list a secas),
+    # así un día malformado degrada el gráfico en vez de tumbar el PDF entero.
+    etiquetas = [str(d.get("day", ""))[5:] for d in dias]  # MM-DD
+    pasos = [d.get("steps") or 0 for d in dias]
+    metas = [d.get("goal") or 0 for d in dias]
+    colores = ["#8a9a7b" if d.get("goal_met") else "#a6a69c" for d in dias]
 
     fig, ax = plt.subplots(figsize=(10, 2.8), dpi=150)
     ax.bar(etiquetas, pasos, color=colores, width=0.7)
@@ -75,14 +81,20 @@ def _grafica_pasos(dias: list) -> str | None:
 
 @app.post("/render")
 def render(payload: RenderPayload, x_auth_token: str = Header(default="")) -> Response:
-    if not SIDECAR_TOKEN or x_auth_token != SIDECAR_TOKEN:
+    if not SIDECAR_TOKEN or not secrets.compare_digest(
+        x_auth_token.encode(), SIDECAR_TOKEN.encode()
+    ):
         raise HTTPException(status_code=401, detail="token inválido")
 
-    html = jinja.get_template("informe.html").render(
-        **payload.model_dump(),
-        grafica_pasos=_grafica_pasos(payload.dias),
-    )
-    pdf = HTML(string=html).write_pdf()
+    try:
+        html = jinja.get_template("informe.html").render(
+            **payload.model_dump(),
+            grafica_pasos=_grafica_pasos(payload.dias),
+        )
+        pdf = HTML(string=html).write_pdf()
+    except Exception as e:
+        logger.exception("[render] error: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
 
     return Response(content=pdf, media_type="application/pdf")
 
@@ -103,7 +115,9 @@ def health() -> dict:
 
 import garmin_sync  # noqa: E402  (import tardío: matplotlib ya configurado)
 
-PG_DSN = os.environ.get("PG_DSN", "postgresql://health:health@db:5432/health")
+PG_DSN = os.environ.get("PG_DSN")
+if not PG_DSN:
+    raise RuntimeError("PG_DSN no está definida: variable de entorno requerida para el sync de Garmin.")
 COOLDOWN_MIN = int(os.environ.get("GARMIN_SYNC_COOLDOWN_MIN", "30"))
 
 _garmin_lock = threading.Lock()
@@ -139,7 +153,9 @@ def sync_garmin(
     force: bool = False,
     x_auth_token: str = Header(default=""),
 ) -> dict:
-    if not SIDECAR_TOKEN or x_auth_token != SIDECAR_TOKEN:
+    if not SIDECAR_TOKEN or not secrets.compare_digest(
+        x_auth_token.encode(), SIDECAR_TOKEN.encode()
+    ):
         raise HTTPException(status_code=401, detail="token inválido")
 
     if _garmin_lock.locked():

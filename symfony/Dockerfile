@@ -24,9 +24,8 @@ RUN printf '<Directory /var/www/html/public>\n  AllowOverride All\n  FallbackRes
 
 WORKDIR /var/www/html
 COPY . .
-RUN composer install --no-interaction --no-dev --optimize-autoloader || true
+RUN composer install --no-interaction --no-dev --optimize-autoloader
 # var/ escribible por Apache desde el build (evita el 500 post-rebuild)
 RUN mkdir -p var/cache var/log var/reports && chown -R www-data:www-data var
-# El "|| true" permite construir la imagen sin .env; instala en el arranque si falta.
 
 EXPOSE 80

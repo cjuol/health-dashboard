@@ -35,7 +35,9 @@ final class DashboardController extends AbstractController
         $activities = $this->repo->activitiesDetailed($from, $to, null);
 
         $mesocycle = $this->repo->currentMesocycle($to);
-        $weekly = $this->repo->weeklySummary((clone $from)->modify('monday this week'), $to);
+        $weekFrom = (clone $from)->modify('monday this week');
+        $weekly = $this->repo->weeklySummary($weekFrom, $to);
+        $weekTargets = $this->weekTargets($weekly, $this->repo->mesocyclesInRange($weekFrom, $to));
         $mesoWeek = null;
         if (null !== $mesocycle) {
             $start = new \DateTimeImmutable($mesocycle['date_from']);
@@ -54,6 +56,7 @@ final class DashboardController extends AbstractController
             'mesocycle' => $mesocycle,
             'meso_week' => $mesoWeek,
             'weekly' => $weekly,
+            'week_targets' => $weekTargets,
             'sync' => $this->repo->syncStatus(),
             'activities' => \array_slice($activities, 0, 10),
             'series' => [
@@ -109,6 +112,30 @@ final class DashboardController extends AbstractController
             'sleep_h' => $sleepH,
             'sleep_score' => $sleep['score'] ?? null,
         ];
+    }
+
+    /**
+     * Pauta (fuerza/natación) aplicable a cada semana, indexada por week_start.
+     * Una semana se juzga contra el mesociclo vigente en su propia fecha, no
+     * contra el mesociclo actual: si el bloque cambió a mitad de semana, las
+     * semanas del bloque anterior no se evalúan con la pauta nueva.
+     */
+    private function weekTargets(array $weekly, array $mesocycles): array
+    {
+        $targets = [];
+        foreach ($weekly as $w) {
+            foreach ($mesocycles as $m) {
+                if ($w['week_start'] >= $m['date_from'] && $w['week_start'] <= $m['date_to']) {
+                    $targets[$w['week_start']] = [
+                        'strength' => (int) $m['strength_sessions_week'],
+                        'swim' => (int) $m['swim_sessions_week'],
+                    ];
+                    break;
+                }
+            }
+        }
+
+        return $targets;
     }
 
     /** Tarjetas con contexto: número + referencia + progreso. */

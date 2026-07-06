@@ -48,7 +48,8 @@
         <tr>
             <td>{{ s.split_order }}</td>
             <td>{{ s.distance_m ? s.distance_m|round ~ ' m' : '—' }}</td>
-            <td>{{ s.duration_s ? ((s.duration_s // 60)) ~ ':' ~ '%02d'|format(s.duration_s % 60) : '—' }}</td>
+            {% set durS = s.duration_s ? (s.duration_s|round) : null %}
+            <td>{{ durS ? ((durS // 60)) ~ ':' ~ '%02d'|format(durS % 60) : '—' }}</td>
             {% if is_swim %}
                 <td>{% if s.distance_m > 0 and s.duration_s > 0 %}{% set p = (s.duration_s / (s.distance_m / 100))|round %}{{ (p // 60) }}:{{ '%02d'|format(p % 60) }}{% else %}—{% endif %}</td>
                 <td>{{ s.strokes ?? '—' }}</td>

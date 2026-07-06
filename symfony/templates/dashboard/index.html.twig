@@ -75,14 +75,15 @@
             <th>Sueño</th><th>HRV</th>
         </tr>
         {% for w in weekly %}
-        {% set okF = mesocycle and w.strength_sessions >= mesocycle.strength_sessions_week %}
-        {% set okN = mesocycle and w.swim_sessions >= mesocycle.swim_sessions_week %}
+        {% set wt = week_targets[w.week_start] ?? (mesocycle ? {strength: mesocycle.strength_sessions_week, swim: mesocycle.swim_sessions_week} : null) %}
+        {% set okF = wt and w.strength_sessions >= wt.strength %}
+        {% set okN = wt and w.swim_sessions >= wt.swim %}
         <tr>
             <td>{{ w.week_start|date('d/m') }}</td>
             <td>{{ w.avg_steps|number_format(0, ',', '.') }}</td>
             <td>{{ w.days_goal_met }}/{{ w.days_with_data }}</td>
-            <td class="{{ okF ? 'ok' : 'warn' }}">{{ w.strength_sessions }}{% if mesocycle %}/{{ mesocycle.strength_sessions_week }}{% endif %}</td>
-            <td class="{{ okN ? 'ok' : 'warn' }}">{{ w.swim_sessions }}{% if mesocycle %}/{{ mesocycle.swim_sessions_week }}{% endif %}
+            <td class="{{ okF ? 'ok' : 'warn' }}">{{ w.strength_sessions }}{% if wt %}/{{ wt.strength }}{% endif %}</td>
+            <td class="{{ okN ? 'ok' : 'warn' }}">{{ w.swim_sessions }}{% if wt %}/{{ wt.swim }}{% endif %}
                 {% if w.swim_m > 0 %}<span class="muted">({{ (w.swim_m / 1000)|number_format(1, ',') }} km)</span>{% endif %}</td>
             <td>{{ w.avg_weight ? w.avg_weight ~ ' kg' : '—' }}</td>
             <td>{% if w.weight_delta is not null %}
@@ -133,7 +134,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <script>
-const S = {{ series|json_encode|raw }};
+const S = {{ series|json_encode(constant('JSON_HEX_TAG') b-or constant('JSON_HEX_APOS') b-or constant('JSON_HEX_AMP') b-or constant('JSON_HEX_QUOT'))|raw }};
 const C = { green:'#8a9a7b', yellow:'#c4b28a', blue:'#8ba4b0', red:'#c4746e', muted:'#737c73', grid:'#393836', fg:'#c5c9c5',
             deep:'#4a6d8c', light:'#8ba4b0', rem:'#8a9a7b', awake:'#c4746e' };
 Chart.defaults.color = C.fg;

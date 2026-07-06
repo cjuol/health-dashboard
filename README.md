@@ -26,6 +26,15 @@ App Android "HC Movimiento" ── POST /api/v1/... ───┘                
    - `cp symfony/.env.example symfony/.env` y rellena `MOVEMENT_API_TOKEN`
      (el mismo `vps.token` de la app Android), `SIDECAR_TOKEN` y `APP_SECRET`.
    - Exporta `SIDECAR_TOKEN` también para compose (o crea un `.env` raíz).
+   - Crea un `.env` en la raíz del repo con `POSTGRES_PASSWORD` y
+     `SIDECAR_TOKEN` (compose falla al arrancar si faltan). En un despliegue
+     **ya existente**, cambiar `POSTGRES_PASSWORD` aquí no actualiza la
+     contraseña real de Postgres: los scripts de `db/` solo corren en el
+     primer arranque, así que hay que cambiarla a mano con
+     `ALTER USER health WITH PASSWORD '...'` dentro del contenedor `db`.
+   - `POSTGRES_PASSWORD` se interpola dentro de la URI `PG_DSN`: usa solo
+     caracteres seguros para URL (alfanuméricos, `-`, `_`); `@`, `:` o `/`
+     romperían la conexión del sidecar.
 
 2. `docker compose up -d --build`
    - En el **primer** arranque, Postgres ejecuta `db/01_schema.sql` (tu esquema

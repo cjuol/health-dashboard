@@ -108,11 +108,23 @@ final class DetailController extends AbstractController
 
     private function range(Request $request, int $defaultDays): array
     {
-        $to = \DateTimeImmutable::createFromFormat('Y-m-d', (string) $request->query->get('hasta'))
-            ?: new \DateTimeImmutable('today');
-        $from = \DateTimeImmutable::createFromFormat('Y-m-d', (string) $request->query->get('desde'))
-            ?: $to->modify(sprintf('-%d days', $defaultDays - 1));
+        $to = $this->parseDate((string) $request->query->get('hasta'))
+            ?? new \DateTimeImmutable('today');
+        $from = $this->parseDate((string) $request->query->get('desde'))
+            ?? $to->modify(sprintf('-%d days', $defaultDays - 1));
 
         return $from <= $to ? [$from, $to] : [$to, $from];
+    }
+
+    /**
+     * Parseo estricto de 'Y-m-d': createFromFormat corrige fechas imposibles
+     * por desbordamiento (p.ej. 2026-13-45 se cuela como una fecha válida).
+     * Se descarta cualquier resultado cuyo round-trip no coincida exacto.
+     */
+    private function parseDate(string $input): ?\DateTimeImmutable
+    {
+        $d = \DateTimeImmutable::createFromFormat('!Y-m-d', $input);
+
+        return ($d && $d->format('Y-m-d') === $input) ? $d : null;
     }
 }

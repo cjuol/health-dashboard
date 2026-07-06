@@ -2,6 +2,7 @@
 
 namespace App\Repository;
 
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 
 /**
@@ -103,7 +104,7 @@ final class HealthRepository
              WHERE activity_id IN (:ids) AND set_type = \'ACTIVE\'
              ORDER BY activity_id, set_order',
             ['ids' => $activityIds],
-            ['ids' => Connection::PARAM_INT_ARRAY],
+            ['ids' => ArrayParameterType::INTEGER],
         );
     }
 
@@ -120,6 +121,19 @@ final class HealthRepository
         );
 
         return false === $row ? null : $row;
+    }
+
+    /** Mesociclos que solapan un rango de fechas (para dar a cada semana la pauta del bloque al que pertenece). */
+    public function mesocyclesInRange(\DateTimeInterface $from, \DateTimeInterface $to): array
+    {
+        return $this->db->fetchAllAssociative(
+            'SELECT id, objective, date_from, date_to, steps_goal,
+                    strength_sessions_week, swim_sessions_week, notes
+             FROM mesocycle
+             WHERE date_from <= :t AND date_to >= :f
+             ORDER BY date_from',
+            ['f' => $from->format('Y-m-d'), 't' => $to->format('Y-m-d')],
+        );
     }
 
     /** Resumen semanal (semanas ISO): pasos, sesiones, peso, recuperación. */
@@ -141,11 +155,11 @@ final class HealthRepository
     public function dailyStepsBySource(\DateTimeInterface $from, \DateTimeInterface $to): array
     {
         return $this->db->fetchAllAssociative(
-            "SELECT day_madrid(bucket_start) AS day,
+            "SELECT (bucket_start AT TIME ZONE 'Europe/Madrid')::date AS day,
                     SUM(steps) FILTER (WHERE source = 'garmin') AS garmin_steps,
                     SUM(steps) FILTER (WHERE source = 'phone')  AS phone_steps
              FROM v_steps_fused_15m
-             WHERE day_madrid(bucket_start) BETWEEN :f AND :t
+             WHERE (bucket_start AT TIME ZONE 'Europe/Madrid')::date BETWEEN :f AND :t
              GROUP BY 1 ORDER BY 1",
             ['f' => $from->format('Y-m-d'), 't' => $to->format('Y-m-d')],
         );
@@ -187,13 +201,13 @@ final class HealthRepository
     public function stepsHeatmap(\DateTimeInterface $from, \DateTimeInterface $to): array
     {
         return $this->db->fetchAllAssociative(
-            "SELECT day_madrid(bucket_start) AS day,
+            "SELECT (bucket_start AT TIME ZONE 'Europe/Madrid')::date AS day,
                     EXTRACT(HOUR FROM bucket_start AT TIME ZONE 'Europe/Madrid')::int AS hour,
                     SUM(steps) AS steps,
                     SUM(steps) FILTER (WHERE source = 'garmin') AS garmin_steps,
                     SUM(steps) FILTER (WHERE source = 'phone')  AS phone_steps
              FROM v_steps_fused_15m
-             WHERE day_madrid(bucket_start) BETWEEN :f AND :t
+             WHERE (bucket_start AT TIME ZONE 'Europe/Madrid')::date BETWEEN :f AND :t
              GROUP BY 1, 2 ORDER BY 1, 2",
             ['f' => $from->format('Y-m-d'), 't' => $to->format('Y-m-d')],
         );

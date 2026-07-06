@@ -3,6 +3,7 @@
 namespace App\Service;
 
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Contracts\HttpClient\Exception\HttpExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
@@ -25,9 +26,23 @@ final class SidecarClient
         $response = $this->http->request('POST', rtrim($this->baseUrl, '/').'/render', [
             'headers' => ['X-Auth-Token' => $this->token],
             'json' => $payload,
-            'timeout' => 120, // rangos largos con gráficas tardan
+            'timeout' => 120, // rangos largos con gráficas tardan (WeasyPrint puede ser lento)
         ]);
 
-        return $response->getContent(); // lanza excepción si no es 2xx
+        try {
+            return $response->getContent(); // lanza excepción si no es 2xx
+        } catch (HttpExceptionInterface $e) {
+            // El mensaje por defecto de Symfony ("HTTP 500 returned for ...")
+            // no incluye el cuerpo de la respuesta: sin él, un token inválido
+            // (401) o un fallo de WeasyPrint/plantilla (500) son indistinguibles
+            // en el error persistido en report.error. Lo añadimos truncado.
+            $body = mb_substr($e->getResponse()->getContent(false), 0, 500);
+
+            throw new \RuntimeException(sprintf(
+                'Sidecar respondió %d en /render: %s',
+                $e->getResponse()->getStatusCode(),
+                $body !== '' ? $body : '(cuerpo vacío)',
+            ), 0, $e);
+        }
     }
 }

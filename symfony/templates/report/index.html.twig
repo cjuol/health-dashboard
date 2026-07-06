@@ -29,7 +29,9 @@
             <td class="muted">{{ r.notes ?? '—' }}</td>
             <td>
                 {% if r.status == 'complete' %}<span class="ok">listo</span>
-                {% elseif r.status == 'failed' %}<span class="err">error</span>
+                {% elseif r.status == 'failed' %}
+                    <span class="err">error</span>
+                    {% if r.error %}<div class="muted" style="font-size:.85em">{{ r.error }}</div>{% endif %}
                 {% else %}<span class="warn">generando…</span>{% endif %}
             </td>
             <td class="muted">{{ r.created_at|date('d/m H:i') }}</td>

@@ -9,6 +9,7 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\ResponseHeaderBag;
+use Symfony\Component\Messenger\Exception\HandlerFailedException;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
@@ -25,7 +26,7 @@ final class ReportController extends AbstractController
     public function index(): Response
     {
         $reports = $this->db->fetchAllAssociative(
-            'SELECT id, date_from, date_to, status, notes, created_at
+            'SELECT id, date_from, date_to, status, notes, error, created_at
              FROM report ORDER BY id DESC LIMIT 50'
         );
 
@@ -35,9 +36,16 @@ final class ReportController extends AbstractController
     #[Route('/informes', name: 'report_create', methods: ['POST'])]
     public function create(Request $request): Response
     {
-        $from = \DateTimeImmutable::createFromFormat('Y-m-d', (string) $request->request->get('desde'));
-        $to = \DateTimeImmutable::createFromFormat('Y-m-d', (string) $request->request->get('hasta'));
-        if (!$from || !$to || $from > $to) {
+        // createFromFormat('Y-m-d', ...) sin '!' hace overflow-correction (p.ej.
+        // "2026-02-30" se cuela como 2 de marzo): forzamos formato estricto y
+        // validamos con un ida-y-vuelta contra el string original.
+        $desdeInput = (string) $request->request->get('desde');
+        $hastaInput = (string) $request->request->get('hasta');
+        $from = \DateTimeImmutable::createFromFormat('!Y-m-d', $desdeInput);
+        $to = \DateTimeImmutable::createFromFormat('!Y-m-d', $hastaInput);
+        $fromValid = $from && $from->format('Y-m-d') === $desdeInput;
+        $toValid = $to && $to->format('Y-m-d') === $hastaInput;
+        if (!$fromValid || !$toValid || $from > $to) {
             $this->addFlash('error', 'Rango de fechas inválido.');
 
             return $this->redirectToRoute('report_index');
@@ -54,8 +62,27 @@ final class ReportController extends AbstractController
         $id = (int) $this->db->lastInsertId();
 
         // Con el transporte 'sync' se genera aquí mismo; con doctrine:// lo
-        // recoge el worker (informes largos sin bloquear la petición).
-        $this->bus->dispatch(new GenerateReport($id));
+        // recoge el worker (informes largos sin bloquear la petición). Sobre
+        // 'sync', cualquier fallo del handler llega aquí envuelto en
+        // HandlerFailedException: el handler ya marcó la fila como 'failed'
+        // (con el motivo en la columna error), así que solo evitamos que la
+        // excepción reviente la petición con un 500 y avisamos al usuario.
+        try {
+            $this->bus->dispatch(new GenerateReport($id));
+        } catch (HandlerFailedException $e) {
+            $reason = $e->getPrevious()?->getMessage() ?? $e->getMessage();
+            $this->addFlash('error', sprintf(
+                'No se pudo generar el informe #%d: %s',
+                $id,
+                mb_substr($reason, 0, 300),
+            ));
+        } catch (\Throwable $e) {
+            $this->addFlash('error', sprintf(
+                'No se pudo generar el informe #%d: %s',
+                $id,
+                mb_substr($e->getMessage(), 0, 300),
+            ));
+        }
 
         return $this->redirectToRoute('report_index');
     }
@@ -72,6 +99,10 @@ final class ReportController extends AbstractController
         }
 
         $response = new BinaryFileResponse($report['pdf_path']);
+        // Sin symfony/mime instalado, BinaryFileResponse::prepare() intenta
+        // adivinar el Content-Type y lanza LogicException ("Mime component
+        // no instalado"). Fijarlo explícitamente evita esa ruta por completo.
+        $response->headers->set('Content-Type', 'application/pdf');
         $response->setContentDisposition(
             ResponseHeaderBag::DISPOSITION_ATTACHMENT,
             sprintf('informe-%s-a-%s.pdf', $report['date_from'], $report['date_to']),
