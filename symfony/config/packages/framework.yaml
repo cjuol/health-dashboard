@@ -2,6 +2,7 @@ framework:
     secret: '%env(APP_SECRET)%'
     http_method_override: false
     session: true
+    csrf_protection: true
     messenger:
         transports:
             # 'sync' ejecuta el handler en la misma petición: funciona sin worker.

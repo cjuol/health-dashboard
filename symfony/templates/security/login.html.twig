@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iniciar sesión · cjuol</title>
+    <style>
+        :root {
+            --bg: #181616; --bg2: #1f1d1d; --panel: #282727; --border: #393836;
+            --fg: #c5c9c5; --muted: #737c73;
+            --green: #8a9a7b; --yellow: #c4b28a; --blue: #8ba4b0; --red: #c4746e;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0; min-height: 100vh; background: var(--bg); color: var(--fg);
+            font: 15px/1.5 system-ui, -apple-system, sans-serif;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .login-card {
+            background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+            padding: 2rem 2.2rem; width: 100%; max-width: 340px;
+        }
+        .login-card h1 {
+            font-size: 1.1rem; color: var(--yellow); margin: 0 0 1.4rem; text-align: center; font-weight: 600;
+        }
+        .login-card label { display: block; font-size: .8rem; color: var(--muted); margin-bottom: .3rem; }
+        .login-card input {
+            width: 100%; background: var(--bg2); color: var(--fg); border: 1px solid var(--border);
+            border-radius: 6px; padding: .5rem .6rem; font: inherit; margin-bottom: 1rem;
+        }
+        .login-card button {
+            width: 100%; cursor: pointer; background: var(--green); color: var(--bg); border: 0;
+            border-radius: 6px; padding: .6rem; font: inherit; font-weight: 600;
+        }
+        .login-card button:hover { filter: brightness(1.1); }
+        .flash { padding: .6rem .8rem; border-radius: 6px; margin-bottom: 1rem; background: var(--bg2); border: 1px solid var(--red); color: var(--red); font-size: .85rem; }
+    </style>
+</head>
+<body>
+<div class="login-card">
+    <h1>⛰ Salud — Garmin + móvil</h1>
+    {% if error %}
+        <div class="flash">{{ error.messageKey|trans(error.messageData, 'security') }}</div>
+    {% endif %}
+    <form method="post">
+        <label for="username">Usuario</label>
+        <input type="text" id="username" name="_username" value="{{ last_username }}" autocomplete="username" required autofocus>
+        <label for="password">Contraseña</label>
+        <input type="password" id="password" name="_password" autocomplete="current-password" required>
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token('authenticate') }}">
+        <button type="submit">Entrar</button>
+    </form>
+</div>
+</body>
+</html>

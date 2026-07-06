@@ -1,0 +1,90 @@
+{% extends 'base.html.twig' %}
+{% block title %}Perfil{% endblock %}
+
+{% block body %}
+<div class="grid2">
+    <div class="panel">
+        <h2>Datos</h2>
+        <form method="post" action="{{ path('perfil_datos') }}" class="inline" style="flex-direction:column; align-items:stretch">
+            <input type="hidden" name="_token" value="{{ csrf_token('perfil_datos') }}">
+            <label>Nombre a mostrar
+                <input type="text" name="display_name" value="{{ user.displayName }}" required>
+            </label>
+            <label>Nombre del entrenador (opcional)
+                <input type="text" name="coach_name" value="{{ user.coachName }}">
+            </label>
+            <button type="submit">Guardar datos</button>
+        </form>
+    </div>
+
+    <div class="panel">
+        <h2>Cambiar contraseña</h2>
+        <form method="post" action="{{ path('perfil_password') }}" class="inline" style="flex-direction:column; align-items:stretch">
+            <input type="hidden" name="_token" value="{{ csrf_token('perfil_password') }}">
+            <label>Contraseña actual
+                <input type="password" name="current_password" autocomplete="current-password" required>
+            </label>
+            <label>Contraseña nueva (mínimo 10 caracteres)
+                <input type="password" name="new_password" autocomplete="new-password" minlength="10" required>
+            </label>
+            <label>Repite la contraseña nueva
+                <input type="password" name="new_password_repeat" autocomplete="new-password" minlength="10" required>
+            </label>
+            <button type="submit">Cambiar contraseña</button>
+        </form>
+    </div>
+</div>
+
+<div class="panel">
+    <h2>Registrar medida corporal</h2>
+    <form method="post" action="{{ path('perfil_medida_guardar') }}" class="inline">
+        <input type="hidden" name="_token" value="{{ csrf_token('perfil_medidas') }}">
+        <label>Fecha <input type="date" name="day" value="{{ today }}" required></label>
+        <label>Peso (kg) <input type="text" name="weight_kg" inputmode="decimal" placeholder="p.ej. 78,4"></label>
+        <label>% Grasa <input type="text" name="body_fat_pct" inputmode="decimal"></label>
+        <label>Cuello (cm) <input type="text" name="neck_cm" inputmode="decimal"></label>
+        <label>Pecho (cm) <input type="text" name="chest_cm" inputmode="decimal"></label>
+        <label>Cintura (cm) <input type="text" name="waist_cm" inputmode="decimal"></label>
+        <label>Cadera (cm) <input type="text" name="hip_cm" inputmode="decimal"></label>
+        <label>Brazo (cm) <input type="text" name="arm_cm" inputmode="decimal"></label>
+        <label>Muslo (cm) <input type="text" name="thigh_cm" inputmode="decimal"></label>
+        <label style="flex:1; min-width:220px">Nota (opcional) <input type="text" name="note"></label>
+        <button type="submit">Guardar medida</button>
+    </form>
+    <p class="muted" style="margin-bottom:0">
+        Guardar una medida en un día ya registrado sustituye los valores de ese día (no duplica filas).
+    </p>
+</div>
+
+<div class="panel">
+    <h2>Historial (últimas {{ measurements|length }})</h2>
+    <table>
+        <tr>
+            <th>Fecha</th><th>Peso</th><th>% Grasa</th><th>Cuello</th><th>Pecho</th>
+            <th>Cintura</th><th>Cadera</th><th>Brazo</th><th>Muslo</th><th>Nota</th><th></th>
+        </tr>
+        {% for m in measurements %}
+        <tr>
+            <td>{{ m.day|date('d/m/Y') }}</td>
+            <td>{{ m.weight_kg ? m.weight_kg ~ ' kg' : '—' }}</td>
+            <td>{{ m.body_fat_pct ? m.body_fat_pct ~ ' %' : '—' }}</td>
+            <td>{{ m.neck_cm ?? '—' }}</td>
+            <td>{{ m.chest_cm ?? '—' }}</td>
+            <td>{{ m.waist_cm ?? '—' }}</td>
+            <td>{{ m.hip_cm ?? '—' }}</td>
+            <td>{{ m.arm_cm ?? '—' }}</td>
+            <td>{{ m.thigh_cm ?? '—' }}</td>
+            <td class="muted">{{ m.note ?? '—' }}</td>
+            <td>
+                <form method="post" action="{{ path('perfil_medida_eliminar', {day: m.day|date('Y-m-d')}) }}" onsubmit="return confirm('¿Eliminar la medida del {{ m.day|date('d/m/Y') }}?')">
+                    <input type="hidden" name="_token" value="{{ csrf_token('perfil_medidas') }}">
+                    <button type="submit" style="background:var(--red)">Eliminar</button>
+                </form>
+            </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="11" class="muted">Todavía no hay medidas registradas.</td></tr>
+        {% endfor %}
+    </table>
+</div>
+{% endblock %}

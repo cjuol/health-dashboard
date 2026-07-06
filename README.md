@@ -37,28 +37,50 @@ App Android "HC Movimiento" ── POST /api/v1/... ───┘                
      romperían la conexión del sidecar.
 
 2. `docker compose up -d --build`
-   - En el **primer** arranque, Postgres ejecuta `db/01_schema.sql` (tu esquema
-     con los dos índices rotos comentados), `db/02_fixes.sql` (correcciones:
-     índices con zona fija, columna `device`, vistas de fusión anti-cero) y
-     `db/03_webapp.sql` (tabla `report`).
-   - Si la base ya existía, aplica a mano `02_fixes.sql` y `03_webapp.sql`.
+   - En el **primer** arranque, Postgres ejecuta todos los `db/*.sql` en
+     orden alfabético, incluido `db/07_users.sql` (usuario del dashboard +
+     medidas corporales).
+   - Si la base ya existía (VPS en producción, volumen ya inicializado),
+     `docker-entrypoint-initdb.d` **no** vuelve a ejecutarse: aplica a mano
+     cualquier `db/*.sql` nuevo, por ejemplo:
+     `docker compose exec -T db psql -U health -d health < db/07_users.sql`.
 
-3. Dashboard: `http://127.0.0.1:8080` (expón por Cloudflare Tunnel igual que
-   el shortlink). Informes en `/informes`.
+3. Crea el usuario del dashboard (una sola vez, o para cambiar la contraseña):
+   `docker compose exec web php bin/console app:user:init` (sin `-T`, para
+   que se asigne una TTY: la contraseña siempre se pide de forma interactiva
+   y oculta, nunca como argumento). Pide usuario, contraseña —mínimo 10
+   caracteres—, nombre a mostrar y nombre del entrenador. Sin usuario creado,
+   `/login` siempre rechaza las credenciales.
 
-4. Apunta la app Android: `vps.baseUrl=https://tu-dominio/` → el endpoint
-   completo queda `POST /api/v1/health/movement`.
+4. Dashboard: `http://127.0.0.1:8087` (expón por Cloudflare Tunnel igual que
+   el shortlink). Pide login; informes en `/informes`, perfil en `/perfil`.
+
+5. Apunta la app Android: `vps.baseUrl=https://tu-dominio/` → el endpoint
+   completo queda `POST /api/v1/health/movement` (no requiere sesión).
 
 ## Rutas
 
 | Ruta | Qué hace |
 |---|---|
-| `GET /` | Dashboard con rango de fechas (por defecto 30 días) |
-| `POST /api/v1/health/movement` | Ingesta de la app Android (Bearer) |
+| `GET /` | Dashboard con rango de fechas (por defecto 30 días) — requiere sesión |
+| `GET/POST /login` | Formulario de login |
+| `GET /logout` | Cierra sesión |
+| `GET /perfil` | Datos del usuario, cambio de contraseña y medidas corporales |
+| `POST /perfil/datos` | Actualiza nombre a mostrar y nombre del entrenador |
+| `POST /perfil/password` | Cambia la contraseña (requiere la actual) |
+| `POST /perfil/medidas` | Alta/actualización de una medida corporal (upsert por día) |
+| `POST /perfil/medidas/{day}/eliminar` | Elimina la medida de un día |
+| `POST /api/v1/health/movement` | Ingesta de la app Android (Bearer, sin sesión) |
 | `GET /informes` | Listado + formulario de informes |
 | `POST /informes` | Crea informe y dispara la generación |
 | `GET /informes/{id}/descargar` | Descarga el PDF |
 | `POST {sidecar}/render` | (interno) JSON fusionado → PDF |
+
+Todas las rutas salvo `/login` y `/api/v1/health/movement` requieren haber
+iniciado sesión (firewall `main` de `security.yaml`). El firewall `api`
+(`^/api/`) tiene `security: false`: la autenticación de la app Android sigue
+siendo el Bearer token que ya comprobaba `MovementApiController`, sin pasar
+por el login del dashboard.
 
 ## Dashboard
 

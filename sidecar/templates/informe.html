@@ -27,7 +27,7 @@
 
 <h1>Informe de seguimiento — {{ atleta }}</h1>
 <div class="meta">
-    Para: {{ entrenador }} · Periodo: {{ rango.desde }} – {{ rango.hasta }} · Generado: {{ generado }}<br>
+    {% if entrenador %}Para: {{ entrenador }} · {% endif %}Periodo: {{ rango.desde }} – {{ rango.hasta }} · Generado: {{ generado }}<br>
     {% if mesociclo %}<strong>Mesociclo {{ mesociclo.numero }} — {{ mesociclo.objetivo }}</strong>
     · Semana {{ mesociclo.semana_actual }} de {{ mesociclo.semanas_total }}
     · Pauta: fuerza ×{{ mesociclo.fuerza_semana }}/sem, natación ×{{ mesociclo.natacion_semana }}/sem,

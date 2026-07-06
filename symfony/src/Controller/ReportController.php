@@ -36,6 +36,18 @@ final class ReportController extends AbstractController
     #[Route('/informes', name: 'report_create', methods: ['POST'])]
     public function create(Request $request): Response
     {
+        // Antes de la sesión con cookie (login por formulario) este POST no
+        // tenía protección CSRF porque no hacía falta: sin autenticación de
+        // sesión no había nada que un sitio externo pudiera "montar" a
+        // nombre del usuario. Con cookies de sesión, un formulario
+        // auto-submit en otro dominio podría generar informes sin permiso;
+        // se exige el mismo token que el resto de POSTs de /perfil.
+        if (!$this->isCsrfTokenValid('report_create', (string) $request->request->get('_token'))) {
+            $this->addFlash('error', 'Token CSRF inválido.');
+
+            return $this->redirectToRoute('report_index');
+        }
+
         // createFromFormat('Y-m-d', ...) sin '!' hace overflow-correction (p.ej.
         // "2026-02-30" se cuela como 2 de marzo): forzamos formato estricto y
         // validamos con un ida-y-vuelta contra el string original.

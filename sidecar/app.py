@@ -42,7 +42,10 @@ class RenderPayload(BaseModel):
     """Payload flexible: el contrato real lo define ReportDataBuilder (Symfony)."""
 
     atleta: str
-    entrenador: str
+    # Puede llegar None cuando el usuario ha borrado el nombre del entrenador
+    # en /perfil (fila de app_user con coach_name NULL): la plantilla omite
+    # la línea "Para: ..." en ese caso.
+    entrenador: str | None = None
     rango: dict
     generado: str
     resumen: dict

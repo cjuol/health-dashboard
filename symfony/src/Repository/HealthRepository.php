@@ -4,6 +4,8 @@ namespace App\Repository;
 
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\Exception\TableNotFoundException;
+use Doctrine\DBAL\ParameterType;
 
 /**
  * Consultas de lectura para dashboard e informes. Todo DBAL sobre el esquema
@@ -295,5 +297,41 @@ final class HealthRepository
         );
 
         return array_column($rows, 'value_ts', 'key');
+    }
+
+    // -------------------------------------------------------------------------
+    // Usuario y medidas corporales (perfil)
+    // -------------------------------------------------------------------------
+
+    /** Fila única de app_user (o null si aún no se ha creado ninguna). */
+    public function currentUser(): ?array
+    {
+        try {
+            $row = $this->db->fetchAssociative(
+                'SELECT id, username, display_name, coach_name FROM app_user ORDER BY id LIMIT 1'
+            );
+        } catch (TableNotFoundException) {
+            // Orden de despliegue: en un volumen ya existente (VPS en
+            // producción) db/07_users.sql solo se aplica a mano, no en el
+            // primer arranque. Si todavía no se ha ejecutado, app_user no
+            // existe y el dashboard/informes deben poder seguir funcionando
+            // (ReportDataBuilder cae a sus literales de reserva).
+            return null;
+        }
+
+        return false === $row ? null : $row;
+    }
+
+    /** Últimas medidas corporales registradas, más recientes primero. */
+    public function bodyMeasurements(int $limit = 30): array
+    {
+        return $this->db->fetchAllAssociative(
+            'SELECT day, weight_kg, body_fat_pct, neck_cm, chest_cm, waist_cm,
+                    hip_cm, arm_cm, thigh_cm, note
+             FROM body_measurement
+             ORDER BY day DESC LIMIT :limit',
+            ['limit' => $limit],
+            ['limit' => ParameterType::INTEGER],
+        );
     }
 }

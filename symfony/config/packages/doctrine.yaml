@@ -3,3 +3,9 @@ doctrine:
         url: '%env(resolve:DATABASE_URL)%'
         # Acceso vía DBAL contra el esquema SQL-first (schema.sql): las vistas
         # v_steps_* ya encapsulan la regla "Garmin si hay, móvil si no".
+        # server_version es obligatorio con las versiones actuales de
+        # doctrine/doctrine-bundle (sin él, ConnectionFactory construye un
+        # StaticServerVersionProvider('') y AbstractPostgreSQLDriver revienta
+        # con InvalidPlatformVersion en la primera conexión, antes incluso de
+        # ejecutar ninguna query). Postgres 16 fijado en docker-compose.yml.
+        server_version: '16'

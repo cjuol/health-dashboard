@@ -5,6 +5,7 @@
 <div class="panel">
     <h2>Generar informe para Alex</h2>
     <form class="inline" method="post" action="{{ path('report_create') }}">
+        <input type="hidden" name="_token" value="{{ csrf_token('report_create') }}">
         <label>Desde <input type="date" name="desde" required></label>
         <label>Hasta <input type="date" name="hasta" required></label>
         <label style="flex:1; min-width: 260px;">Notas para el entrenador (opcional)

@@ -27,6 +27,7 @@ final class ReportDataBuilder
         $sets = $this->repo->strengthSets(array_column($activities, 'activity_id'));
         $mesocycle = $this->repo->currentMesocycle($to);
         $weekly = $this->repo->weeklySummary($from, $to);
+        $user = $this->repo->currentUser();
 
         // Días con sesión (fuerza o natación) → para el semáforo de recuperación
         $trainingDays = [];
@@ -134,8 +135,14 @@ final class ReportDataBuilder
         ], $weekly);
 
         return [
-            'atleta' => 'Cristóbal',
-            'entrenador' => 'Alex Hornero',
+            // El fallback a los literales originales solo aplica cuando NO
+            // hay ninguna fila en app_user (despliegue recién migrado, sin
+            // `app:user:init` todavía, o tabla inexistente). Si la fila
+            // existe, se respetan sus valores tal cual (coach_name puede ser
+            // NULL/vacío intencionadamente tras borrarlo en /perfil, y eso no
+            // debe "resucitar" el nombre por defecto).
+            'atleta' => null !== $user ? $user['display_name'] : 'Cristóbal',
+            'entrenador' => null !== $user ? $user['coach_name'] : 'Alex Hornero',
             'rango' => ['desde' => $from->format('d/m/Y'), 'hasta' => $to->format('d/m/Y')],
             'generado' => (new \DateTimeImmutable())->format('d/m/Y H:i'),
             'mesociclo' => $meso,

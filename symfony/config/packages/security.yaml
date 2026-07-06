@@ -1,0 +1,33 @@
+security:
+    password_hashers:
+        App\Security\AppUser: auto
+
+    providers:
+        app_user_provider:
+            id: App\Security\AppUserProvider
+
+    firewalls:
+        # La app Android sigue autenticándose con su propio Bearer token,
+        # comprobado a mano dentro de MovementApiController: este firewall
+        # deja pasar la petición sin sesión ni redirección a /login. No
+        # tocar el contrato de ese controlador.
+        api:
+            pattern: ^/api/
+            security: false
+
+        main:
+            lazy: true
+            provider: app_user_provider
+            form_login:
+                login_path: app_login
+                check_path: app_login
+                default_target_path: dashboard
+                enable_csrf: true
+            logout:
+                path: app_logout
+                target: app_login
+                enable_csrf: true
+
+    access_control:
+        - { path: ^/login, roles: PUBLIC_ACCESS }
+        - { path: ^/, roles: IS_AUTHENTICATED_FULLY }

@@ -21,6 +21,7 @@
             padding: .8rem 1.5rem; background: var(--bg2); border-bottom: 1px solid var(--border);
         }
         header h1 { font-size: 1rem; margin: 0; color: var(--yellow); font-weight: 600; }
+        nav { display: flex; align-items: center; flex: 1; }
         nav a { color: var(--muted); text-decoration: none; margin-right: 1rem; }
         nav a:hover, nav a.active { color: var(--fg); }
         main { max-width: 1100px; margin: 0 auto; padding: 1.5rem; }
@@ -46,6 +47,7 @@
         form.inline { display: flex; gap: .6rem; align-items: end; flex-wrap: wrap; }
         form.inline label { display: flex; flex-direction: column; gap: .2rem; font-size: .8rem; color: var(--muted); }
         .flash { padding: .6rem 1rem; border-radius: 6px; margin-bottom: 1rem; background: var(--panel); border: 1px solid var(--red); color: var(--red); }
+        .flash.flash-success { border-color: var(--green); color: var(--green); }
     </style>
 </head>
 <body>
@@ -56,10 +58,13 @@
         <a href="{{ path('activities') }}" class="{{ app.current_route starts with 'activit' ? 'active' }}">Actividades</a>
         <a href="{{ path('detail', {metric: 'pasos'}) }}" class="{{ app.current_route == 'detail' ? 'active' }}">Detalle</a>
         <a href="{{ path('report_index') }}" class="{{ app.current_route starts with 'report' ? 'active' }}">Informes</a>
+        <a href="{{ path('perfil_index') }}" class="{{ app.current_route starts with 'perfil' ? 'active' }}" style="margin-left:auto">Perfil</a>
+        <a href="{{ path('app_logout', {_csrf_token: csrf_token('logout')}) }}">Salir</a>
     </nav>
 </header>
 <main>
     {% for message in app.flashes('error') %}<div class="flash">{{ message }}</div>{% endfor %}
+    {% for message in app.flashes('success') %}<div class="flash flash-success">{{ message }}</div>{% endfor %}
     {% block body %}{% endblock %}
 </main>
 </body>
