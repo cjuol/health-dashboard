@@ -22,7 +22,7 @@
     <table>
         <tr>
             <th>Fecha</th><th>Tipo</th><th>Sesión</th><th>Dur.</th><th>Dist.</th>
-            <th>Ritmo</th><th>FC med/máx</th><th>TE aer/ana</th><th>Carga</th><th>SWOLF</th><th>kcal</th>
+            <th>FC media</th><th>kcal</th>
         </tr>
         {% for a in activities %}
         {% set isSwim = 'swim' in a.activity_type %}
@@ -32,22 +32,11 @@
             <td><a href="{{ path(routes.activity_show, route_params|merge({id: a.activity_id})) }}" style="color:var(--link)">{{ a.activity_name }}</a></td>
             <td>{{ a.duration_s ? (a.duration_s / 60)|round ~ "'" : '—' }}</td>
             <td>{{ a.distance_m ? (a.distance_m / 1000)|number_format(2, ',') ~ ' km' : '—' }}</td>
-            <td>{% if isSwim and a.distance_m > 0 and a.duration_s > 0 %}
-                {% set s100 = (a.duration_s / (a.distance_m / 100))|round %}
-                {{ (s100 // 60) }}:{{ '%02d'|format(s100 % 60) }} /100m
-                {% else %}—{% endif %}</td>
-            <td>{{ a.avg_hr ?? '—' }} / {{ a.max_hr ?? '—' }}</td>
-            <td>{{ a.te_aerobic ? a.te_aerobic|number_format(1, ',') : '—' }} / {{ a.te_anaerobic ? a.te_anaerobic|number_format(1, ',') : '—' }}</td>
-            <td>{{ a.training_load ? a.training_load|round : '—' }}</td>
-            <td>{{ a.swolf ? a.swolf|round : '—' }}</td>
+            <td>{{ a.avg_hr ?? '—' }}</td>
             <td>{{ a.calories ?? '—' }}</td>
         </tr>
         {% else %}
-        <tr><td colspan="11" class="muted">Sin sesiones en el rango.</td></tr>
+        <tr><td colspan="7" class="muted">Sin sesiones en el rango.</td></tr>
         {% endfor %}
     </table>
-    <p class="muted" style="margin-bottom:0; font-size:.78rem">
-        TE = Training Effect (0–5): aeróbico / anaeróbico. Carga = training load de la sesión.
-        SWOLF = eficiencia en natación (menos es mejor).
-    </p>
 </div>
