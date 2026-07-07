@@ -29,12 +29,11 @@
 <div class="grid2">
     <div class="panel">
         <h2>Mapa de calor: pasos por hora y día <span class="muted" style="font-weight:400">(azul = Garmin, ámbar = móvil — tus turnos se pintan solos)</span></h2>
-        <div style="overflow-x:auto">
-        {# width:auto anula el table{width:100%} global: sin el, la primera
-           columna absorbe todo el ancho sobrante y la cuadricula queda
-           desplazada con un gran hueco a la izquierda. #}
-        <table style="border-collapse:separate; border-spacing:1px; font-size:.6rem; width:auto">
-            <tr><th></th>{% for h in 0..23 %}<th class="muted" style="padding:0 1px; border:0">{{ h }}</th>{% endfor %}</tr>
+        {# table-layout:fixed reparte el ancho del panel a partes iguales entre
+           las 24 columnas de horas (la de fechas queda fija), de modo que la
+           cuadricula llena su panel en cualquier ancho de pantalla. #}
+        <table style="table-layout:fixed; border-collapse:separate; border-spacing:1px; font-size:.6rem">
+            <tr><th style="width:2.6em"></th>{% for h in 0..23 %}<th class="muted" style="padding:0; border:0; text-align:center; overflow:hidden">{{ h }}</th>{% endfor %}</tr>
             {% for day, hours in data.heatmap.rows %}
             <tr>
                 <td class="muted" style="border:0; padding:1px 3px 1px 0; white-space:nowrap">{{ day|date('d/m') }}</td>
@@ -44,19 +43,21 @@
                         {% set alpha = 0.15 + 0.85 * (cell.steps / data.heatmap.max) %}
                         {% set isPhone = (cell.phone_steps ?? 0) >= (cell.garmin_steps ?? 0) %}
                         <td title="{{ day }} {{ h }}h: {{ cell.steps }} pasos ({{ isPhone ? 'móvil' : 'Garmin' }})"
-                            style="width:11px; height:8px; border:0; border-radius:1px; padding:0;
+                            style="height:13px; border:0; border-radius:1px; padding:0;
                                    background: rgba({{ isPhone ? '201,133,0' : '57,135,229' }}, {{ alpha|round(2) }})"></td>
                     {% else %}
-                        <td style="width:11px; height:8px; border:0; border-radius:1px; padding:0; background:var(--bg2)"></td>
+                        <td style="height:13px; border:0; border-radius:1px; padding:0; background:var(--bg2)"></td>
                     {% endif %}
                 {% endfor %}
             </tr>
             {% endfor %}
         </table>
-        </div>
     </div>
-    <div class="panel" style="max-height:420px; overflow-y:auto">
+    {# El grid iguala la altura de ambos paneles; la lista scrollea por dentro
+       (min-height:0 permite que el flex hijo encoja) en vez de fijar un alto. #}
+    <div class="panel" style="display:flex; flex-direction:column">
         <h2>Pasos por día</h2>
+        <div style="overflow-y:auto; flex:1; min-height:0; max-height:60vh">
         <table>
             <tr><th>Día</th><th>Pasos teléfono</th><th>Pasos Garmin</th><th>Objetivo</th><th>% objetivo</th></tr>
             {% for row in data.step_days %}
@@ -71,6 +72,7 @@
             <tr><td colspan="5" class="muted">Sin datos en este rango.</td></tr>
             {% endfor %}
         </table>
+        </div>
     </div>
 </div>
 {% elseif metric == 'sueno' %}
