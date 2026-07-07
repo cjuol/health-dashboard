@@ -10,7 +10,9 @@
         <label>Contraseña <input type="password" name="password" minlength="8" autocomplete="new-password" required></label>
         <label>Desde <input type="date" name="date_from" required></label>
         <label>Hasta <input type="date" name="date_to" required></label>
-        <label>Caduca <input type="datetime-local" name="expires_at" required></label>
+        {# Solo fecha: el enlace caduca al final del dia elegido (el controlador
+           ya interpreta 'Y-m-d' asi); datetime-local es hostil en Firefox. #}
+        <label>Caduca (fin del día) <input type="date" name="expires_at" required></label>
         <button type="submit">Crear enlace</button>
     </form>
     <p class="muted" style="margin-bottom:0">
