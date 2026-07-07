@@ -237,6 +237,9 @@ final class ShareController extends AbstractController
                 'intensity' => $this->repo->weeklyIntensity($from, $to),
             ],
         };
+        if ('pasos' === $metric) {
+            $data['step_days'] = $this->stepDayRows($data['daily'], $data['by_source']);
+        }
 
         return $this->render('share/detail.html.twig', [
             'share' => $share,
@@ -332,6 +335,31 @@ final class ShareController extends AbstractController
         krsort($rows);
 
         return ['rows' => $rows, 'max' => $max];
+    }
+
+    /** Combina dailySteps() + dailyStepsBySource() en filas por día (mismo criterio que DetailController). */
+    private function stepDayRows(array $daily, array $bySource): array
+    {
+        $sourceByDay = [];
+        foreach ($bySource as $r) {
+            $sourceByDay[$r['day']] = $r;
+        }
+
+        $rows = [];
+        foreach ($daily as $r) {
+            $s = $sourceByDay[$r['day']] ?? null;
+            $rows[] = [
+                'day' => $r['day'],
+                'phone_steps' => (int) ($s['phone_steps'] ?? 0),
+                'garmin_steps' => (int) ($s['garmin_steps'] ?? 0),
+                'daily_goal' => (int) $r['daily_goal'],
+                'pct_goal' => (float) $r['pct_goal'],
+                'goal_met' => (bool) $r['goal_met'],
+            ];
+        }
+        usort($rows, static fn (array $a, array $b) => $b['day'] <=> $a['day']);
+
+        return $rows;
     }
 
     /**

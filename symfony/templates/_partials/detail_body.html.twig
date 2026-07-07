@@ -5,6 +5,10 @@
    métrica sí necesitan la ruta correcta (propietario vs invitado).
 
    Variables esperadas: metric, metrics, from, to, data, routes.detail, route_params
+   Para metric == 'pasos', data también trae step_days: filas por día
+   (day, phone_steps, garmin_steps, daily_goal, pct_goal, goal_met) ya
+   fusionadas en el controlador a partir de dailySteps()+dailyStepsBySource(),
+   más recientes primero — usadas por la lista junto al heatmap.
 #}
 <form class="inline panel" method="get">
     <nav style="display:flex; gap:.4rem; margin-right:auto">
@@ -22,29 +26,49 @@
 
 {% if metric == 'pasos' %}
 <div class="panel"><h2>Pasos por fuente</h2><canvas id="ch1"></canvas></div>
-<div class="panel">
-    <h2>Mapa de calor: pasos por hora y día <span class="muted" style="font-weight:400">(azul = Garmin, ámbar = móvil — tus turnos se pintan solos)</span></h2>
-    <div style="overflow-x:auto">
-    <table style="border-collapse:separate; border-spacing:2px; font-size:.7rem">
-        <tr><th></th>{% for h in 0..23 %}<th class="muted" style="padding:1px 2px; border:0">{{ h }}</th>{% endfor %}</tr>
-        {% for day, hours in data.heatmap.rows %}
-        <tr>
-            <td class="muted" style="border:0; padding:1px 6px 1px 0; white-space:nowrap">{{ day|date('d/m') }}</td>
-            {% for h in 0..23 %}
-                {% set cell = hours[h] ?? null %}
-                {% if cell and cell.steps > 0 %}
-                    {% set alpha = 0.15 + 0.85 * (cell.steps / data.heatmap.max) %}
-                    {% set isPhone = (cell.phone_steps ?? 0) >= (cell.garmin_steps ?? 0) %}
-                    <td title="{{ day }} {{ h }}h: {{ cell.steps }} pasos ({{ isPhone ? 'móvil' : 'Garmin' }})"
-                        style="width:22px; height:16px; border:0; border-radius:2px; padding:0;
-                               background: rgba({{ isPhone ? '201,133,0' : '57,135,229' }}, {{ alpha|round(2) }})"></td>
-                {% else %}
-                    <td style="width:22px; height:16px; border:0; border-radius:2px; padding:0; background:var(--bg2)"></td>
-                {% endif %}
+<div class="grid2">
+    <div class="panel">
+        <h2>Mapa de calor: pasos por hora y día <span class="muted" style="font-weight:400">(azul = Garmin, ámbar = móvil — tus turnos se pintan solos)</span></h2>
+        <div style="overflow-x:auto">
+        {# Celdas compactas pero etiquetas legibles: por debajo de ~9px el texto no se lee. #}
+        <table style="border-collapse:separate; border-spacing:1px; font-size:.6rem">
+            <tr><th></th>{% for h in 0..23 %}<th class="muted" style="padding:0 1px; border:0">{{ h }}</th>{% endfor %}</tr>
+            {% for day, hours in data.heatmap.rows %}
+            <tr>
+                <td class="muted" style="border:0; padding:1px 3px 1px 0; white-space:nowrap">{{ day|date('d/m') }}</td>
+                {% for h in 0..23 %}
+                    {% set cell = hours[h] ?? null %}
+                    {% if cell and cell.steps > 0 %}
+                        {% set alpha = 0.15 + 0.85 * (cell.steps / data.heatmap.max) %}
+                        {% set isPhone = (cell.phone_steps ?? 0) >= (cell.garmin_steps ?? 0) %}
+                        <td title="{{ day }} {{ h }}h: {{ cell.steps }} pasos ({{ isPhone ? 'móvil' : 'Garmin' }})"
+                            style="width:11px; height:8px; border:0; border-radius:1px; padding:0;
+                                   background: rgba({{ isPhone ? '201,133,0' : '57,135,229' }}, {{ alpha|round(2) }})"></td>
+                    {% else %}
+                        <td style="width:11px; height:8px; border:0; border-radius:1px; padding:0; background:var(--bg2)"></td>
+                    {% endif %}
+                {% endfor %}
+            </tr>
             {% endfor %}
-        </tr>
-        {% endfor %}
-    </table>
+        </table>
+        </div>
+    </div>
+    <div class="panel" style="max-height:420px; overflow-y:auto">
+        <h2>Pasos por día</h2>
+        <table>
+            <tr><th>Día</th><th>Pasos teléfono</th><th>Pasos Garmin</th><th>Objetivo</th><th>% objetivo</th></tr>
+            {% for row in data.step_days %}
+            <tr>
+                <td>{{ row.day|date('d/m/Y') }}</td>
+                <td>{{ row.phone_steps|number_format(0, ',', '.') }}</td>
+                <td>{{ row.garmin_steps|number_format(0, ',', '.') }}</td>
+                <td>{{ row.daily_goal|number_format(0, ',', '.') }}</td>
+                <td>{{ row.pct_goal|round(0, 'common') }} %{{ row.goal_met ? ' ✓' }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="muted">Sin datos en este rango.</td></tr>
+            {% endfor %}
+        </table>
     </div>
 </div>
 {% elseif metric == 'sueno' %}

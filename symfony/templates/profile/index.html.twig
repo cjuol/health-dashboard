@@ -36,6 +36,20 @@
 </div>
 
 <div class="panel">
+    <h2>Objetivo diario de pasos</h2>
+    <form method="post" action="{{ path('perfil_objetivo') }}" class="inline">
+        <input type="hidden" name="_token" value="{{ csrf_token('perfil_objetivo') }}">
+        <label>Pasos al día
+            <input type="number" name="daily_goal" min="1000" max="50000" step="1" value="{{ step_goal }}" required>
+        </label>
+        <button type="submit">Guardar objetivo</button>
+    </form>
+    <p class="muted" style="margin-bottom:0">
+        El nuevo objetivo aplica desde hoy en adelante; los días pasados conservan el objetivo que estaba vigente entonces.
+    </p>
+</div>
+
+<div class="panel">
     <h2>Registrar medida corporal</h2>
     <form method="post" action="{{ path('perfil_medida_guardar') }}" class="inline">
         <input type="hidden" name="_token" value="{{ csrf_token('perfil_medidas') }}">

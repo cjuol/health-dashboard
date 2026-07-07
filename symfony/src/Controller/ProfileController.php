@@ -35,6 +35,7 @@ final class ProfileController extends AbstractController
             'user' => $user,
             'measurements' => $this->repo->bodyMeasurements(30),
             'today' => (new \DateTimeImmutable('today'))->format('Y-m-d'),
+            'step_goal' => $this->repo->currentStepGoal(),
         ]);
     }
 
@@ -64,6 +65,38 @@ final class ProfileController extends AbstractController
         );
 
         $this->addFlash('success', 'Datos actualizados.');
+
+        return $this->redirectToRoute('perfil_index');
+    }
+
+    #[Route('/perfil/objetivo', name: 'perfil_objetivo', methods: ['POST'])]
+    public function updateStepGoal(Request $request): Response
+    {
+        if (!$this->isCsrfTokenValid('perfil_objetivo', (string) $request->request->get('_token'))) {
+            throw $this->createAccessDeniedException('Token CSRF inválido.');
+        }
+
+        $raw = trim((string) $request->request->get('daily_goal'));
+        if (!ctype_digit($raw) || (int) $raw < 1000 || (int) $raw > 50000) {
+            $this->addFlash('error', 'El objetivo debe ser un número entero entre 1.000 y 50.000 pasos.');
+
+            return $this->redirectToRoute('perfil_index');
+        }
+        $goal = (int) $raw;
+
+        // Vigencia desde hoy: el histórico (días anteriores) mantiene el
+        // objetivo que estuviera vigente en su momento, ver step_goal en
+        // db/01_schema.sql y el patrón de db/04_mesociclo.sql.
+        $this->db->executeStatement(
+            'INSERT INTO step_goal (valid_from, daily_goal, note)
+             VALUES (CURRENT_DATE, :goal, :note)
+             ON CONFLICT (valid_from) DO UPDATE SET
+                 daily_goal = EXCLUDED.daily_goal,
+                 note = EXCLUDED.note',
+            ['goal' => $goal, 'note' => 'ajustado desde el perfil'],
+        );
+
+        $this->addFlash('success', sprintf('Objetivo diario actualizado a %s pasos, a partir de hoy.', number_format($goal, 0, ',', '.')));
 
         return $this->redirectToRoute('perfil_index');
     }

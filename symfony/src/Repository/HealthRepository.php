@@ -359,4 +359,16 @@ final class HealthRepository
             ['limit' => ParameterType::INTEGER],
         );
     }
+
+    /** Objetivo de pasos vigente hoy (la fila con mayor valid_from <= hoy). */
+    public function currentStepGoal(): ?int
+    {
+        $value = $this->db->fetchOne(
+            'SELECT daily_goal FROM step_goal
+             WHERE valid_from <= CURRENT_DATE
+             ORDER BY valid_from DESC LIMIT 1',
+        );
+
+        return false === $value ? null : (int) $value;
+    }
 }
