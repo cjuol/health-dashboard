@@ -26,7 +26,7 @@
         <tr>
             <td>{{ a.start_time|date('d/m H:i') }}</td>
             <td>{{ a.is_strength ? '🏋' : (isSwim ? '🏊' : '🏃') }} {{ a.activity_type }}</td>
-            <td><a href="{{ path('activity_show', {id: a.activity_id}) }}" style="color:var(--blue)">{{ a.activity_name }}</a></td>
+            <td><a href="{{ path('activity_show', {id: a.activity_id}) }}" style="color:var(--link)">{{ a.activity_name }}</a></td>
             <td>{{ a.duration_s ? (a.duration_s / 60)|round ~ "'" : '—' }}</td>
             <td>{{ a.distance_m ? (a.distance_m / 1000)|number_format(2, ',') ~ ' km' : '—' }}</td>
             <td>{% if isSwim and a.distance_m > 0 and a.duration_s > 0 %}

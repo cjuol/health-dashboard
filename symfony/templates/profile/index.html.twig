@@ -78,7 +78,7 @@
             <td>
                 <form method="post" action="{{ path('perfil_medida_eliminar', {day: m.day|date('Y-m-d')}) }}" onsubmit="return confirm('¿Eliminar la medida del {{ m.day|date('d/m/Y') }}?')">
                     <input type="hidden" name="_token" value="{{ csrf_token('perfil_medidas') }}">
-                    <button type="submit" style="background:var(--red)">Eliminar</button>
+                    <button type="submit" style="background:var(--crit)">Eliminar</button>
                 </form>
             </td>
         </tr>

@@ -25,7 +25,8 @@
 {% if zones %}
 <div class="panel">
     <h2>Tiempo en zonas de FC</h2>
-    {% set zc = {1: '#737c73', 2: '#8ba4b0', 3: '#8a9a7b', 4: '#c4b28a', 5: '#c4746e'} %}
+    {# Z1 en gris neutro (esfuerzo mínimo); Z2-Z5 usan las series 1-4 de la paleta validada, con contraste probado entre pares adyacentes. #}
+    {% set zc = {1: '#737c73', 2: '#3987e5', 3: '#199e70', 4: '#c98500', 5: '#9085e9'} %}
     <div style="display:flex; height:34px; border-radius:6px; overflow:hidden; margin-bottom:.6rem">
         {% for z in zones %}{% if z.pct > 0 %}
         <div title="Z{{ z.zone }}: {{ (z.secs_in_zone / 60)|round }} min ({{ z.pct }}%)"
@@ -77,5 +78,5 @@
 </div>
 {% endif %}
 
-<p><a href="{{ path('activities') }}" style="color:var(--blue)">← Volver a actividades</a></p>
+<p><a href="{{ path('activities') }}" style="color:var(--link)">← Volver a actividades</a></p>
 {% endblock %}

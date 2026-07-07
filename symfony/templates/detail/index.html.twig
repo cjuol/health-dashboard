@@ -7,7 +7,7 @@
         {% for m in metrics %}
         <a href="{{ path('detail', {metric: m}) }}?desde={{ from|date('Y-m-d') }}&hasta={{ to|date('Y-m-d') }}"
            style="padding:.35rem .7rem; border-radius:6px; text-decoration:none;
-                  {{ m == metric ? 'background:var(--green); color:var(--bg); font-weight:600' : 'color:var(--muted)' }}">
+                  {{ m == metric ? 'background:var(--accent); color:var(--bg); font-weight:600' : 'color:var(--muted)' }}">
             {{ {pasos: 'Pasos', sueno: 'Sueño', cuerpo: 'Cuerpo', carga: 'Carga'}[m] }}</a>
         {% endfor %}
     </nav>
@@ -19,7 +19,7 @@
 {% if metric == 'pasos' %}
 <div class="panel"><h2>Pasos por fuente</h2><canvas id="ch1"></canvas></div>
 <div class="panel">
-    <h2>Mapa de calor: pasos por hora y día <span class="muted" style="font-weight:400">(azul = Garmin, amarillo = móvil — tus turnos se pintan solos)</span></h2>
+    <h2>Mapa de calor: pasos por hora y día <span class="muted" style="font-weight:400">(azul = Garmin, ámbar = móvil — tus turnos se pintan solos)</span></h2>
     <div style="overflow-x:auto">
     <table style="border-collapse:separate; border-spacing:2px; font-size:.7rem">
         <tr><th></th>{% for h in 0..23 %}<th class="muted" style="padding:1px 2px; border:0">{{ h }}</th>{% endfor %}</tr>
@@ -33,7 +33,7 @@
                     {% set isPhone = (cell.phone_steps ?? 0) >= (cell.garmin_steps ?? 0) %}
                     <td title="{{ day }} {{ h }}h: {{ cell.steps }} pasos ({{ isPhone ? 'móvil' : 'Garmin' }})"
                         style="width:22px; height:16px; border:0; border-radius:2px; padding:0;
-                               background: rgba({{ isPhone ? '196,178,138' : '139,164,176' }}, {{ alpha|round(2) }})"></td>
+                               background: rgba({{ isPhone ? '201,133,0' : '57,135,229' }}, {{ alpha|round(2) }})"></td>
                 {% else %}
                     <td style="width:22px; height:16px; border:0; border-radius:2px; padding:0; background:var(--bg2)"></td>
                 {% endif %}
@@ -65,9 +65,13 @@
 <script>
 const D = {{ data|json_encode(constant('JSON_HEX_TAG') b-or constant('JSON_HEX_APOS') b-or constant('JSON_HEX_AMP') b-or constant('JSON_HEX_QUOT'))|raw }};
 const M = '{{ metric }}';
-const C = { green:'#8a9a7b', yellow:'#c4b28a', blue:'#8ba4b0', red:'#c4746e', muted:'#737c73',
-            deep:'#4a6d8c', light:'#8ba4b0', rem:'#8a9a7b', awake:'#c4746e' };
-Chart.defaults.color = '#c5c9c5'; Chart.defaults.borderColor = '#393836';
+// Paleta validada contra CVD (daltonismo): slots de serie en orden fijo + colores de estado.
+// Misma identidad que en el dashboard: Garmin = slot 1, Móvil = slot 3, fases de sueño 1-4, HRV = slot 1, peso diario = slot 1 / tendencia = slot 3.
+const C = { s1:'#3987e5', s2:'#199e70', s3:'#c98500', s4:'#9085e9', s5:'#e66767',
+            ok:'#0ca30c', warn:'#fab219', crit:'#d03b3b',
+            muted:'#737c73', grid:'#2c2c2a', axis:'#383835', ink:'#c5c9c5', panel:'#282727' };
+Chart.defaults.color = '#c5c9c5'; Chart.defaults.borderColor = C.axis;
+Chart.defaults.scale.grid.color = C.grid;
 
 if (M === 'pasos') {
     const days = D.by_source.map(r => r.day.slice(5));
@@ -75,10 +79,10 @@ if (M === 'pasos') {
     new Chart(ch1, { options: { scales: { x: { stacked: true }, y: { stacked: true } } }, data: {
         labels: days,
         datasets: [
-            { type: 'bar', label: 'Garmin', data: D.by_source.map(r => +r.garmin_steps || 0), backgroundColor: C.blue },
-            { type: 'bar', label: 'Móvil',  data: D.by_source.map(r => +r.phone_steps || 0), backgroundColor: C.yellow },
+            { type: 'bar', label: 'Garmin', data: D.by_source.map(r => +r.garmin_steps || 0), backgroundColor: C.s1 },
+            { type: 'bar', label: 'Móvil',  data: D.by_source.map(r => +r.phone_steps || 0), backgroundColor: C.s3 },
             { type: 'line', label: 'Objetivo', data: D.by_source.map(r => goal[r.day] ?? null),
-              borderColor: C.green, pointRadius: 0, stepped: true },
+              borderColor: C.ink, borderDash: [6, 4], pointRadius: 0, stepped: true },
         ]}});
 }
 if (M === 'sueno') {
@@ -87,17 +91,17 @@ if (M === 'sueno') {
     new Chart(ch1, { options: { scales: { x:{stacked:true}, y:{stacked:true,min:0,max:10}, y2:{position:'right',min:0,max:100,grid:{display:false}} } }, data: {
         labels: days,
         datasets: [
-            { type:'bar', label:'Profundo', data: ph('deep_s'),  backgroundColor: C.deep },
-            { type:'bar', label:'Ligero',   data: ph('light_s'), backgroundColor: C.light },
-            { type:'bar', label:'REM',      data: ph('rem_s'),   backgroundColor: C.rem },
-            { type:'bar', label:'Despierto',data: ph('awake_s'), backgroundColor: C.awake },
-            { type:'line', label:'Score', data: D.sleep.map(r => r.score), borderColor: C.yellow, yAxisID:'y2', pointRadius:2 },
+            { type:'bar', label:'Profundo', data: ph('deep_s'),  backgroundColor: C.s1, borderColor: C.panel, borderWidth: 2 },
+            { type:'bar', label:'Ligero',   data: ph('light_s'), backgroundColor: C.s2, borderColor: C.panel, borderWidth: 2 },
+            { type:'bar', label:'REM',      data: ph('rem_s'),   backgroundColor: C.s3, borderColor: C.panel, borderWidth: 2 },
+            { type:'bar', label:'Despierto',data: ph('awake_s'), backgroundColor: C.s4, borderColor: C.panel, borderWidth: 2 },
+            { type:'line', label:'Score', data: D.sleep.map(r => r.score), borderColor: C.ink, yAxisID:'y2', pointRadius:2 },
         ]}});
     new Chart(ch2, { type:'line', options:{ scales:{ y2:{position:'right',min:85,max:100,grid:{display:false}} } }, data: {
         labels: days,
         datasets: [
-            { label:'Respiración (rpm)', data: D.sleep.map(r => r.respiration_avg ? +r.respiration_avg : null), borderColor: C.blue, pointRadius:2, spanGaps:true },
-            { label:'SpO2 %', data: D.sleep.map(r => r.spo2_avg ? +r.spo2_avg : null), borderColor: C.green, yAxisID:'y2', pointRadius:2, spanGaps:true },
+            { label:'Respiración (rpm)', data: D.sleep.map(r => r.respiration_avg ? +r.respiration_avg : null), borderColor: C.s1, pointRadius:2, spanGaps:true },
+            { label:'SpO2 %', data: D.sleep.map(r => r.spo2_avg ? +r.spo2_avg : null), borderColor: C.s2, yAxisID:'y2', pointRadius:2, spanGaps:true },
         ]}});
 }
 if (M === 'cuerpo') {
@@ -106,29 +110,29 @@ if (M === 'cuerpo') {
     const ma7 = peso.map((_, i) => { const w = peso.slice(Math.max(0,i-6), i+1).filter(v => v !== null);
         return w.length >= 3 ? +(w.reduce((a,b)=>a+b,0)/w.length).toFixed(2) : null; });
     new Chart(ch1, { type:'line', data: { labels: days, datasets: [
-        { label:'kg (día)', data: peso, borderColor: C.muted, pointRadius:2, borderWidth:1, spanGaps:true },
-        { label:'Tendencia 7d', data: ma7, borderColor: C.yellow, pointRadius:0, borderWidth:2.5, spanGaps:true }]}});
+        { label:'kg (día)', data: peso, borderColor: C.s1, pointRadius:2, borderWidth:1, spanGaps:true },
+        { label:'Tendencia 7d', data: ma7, borderColor: C.s3, pointRadius:0, borderWidth:2.5, spanGaps:true }]}});
     new Chart(ch2, { type:'line', options:{ scales:{ y2:{position:'right',grid:{display:false}} } }, data: { labels: days, datasets: [
-        { label:'% grasa', data: D.body.map(r => r.body_fat_pct ? +r.body_fat_pct : null), borderColor: C.red, pointRadius:2, spanGaps:true },
-        { label:'Músculo kg', data: D.body.map(r => r.muscle_mass_kg ? +r.muscle_mass_kg : null), borderColor: C.green, yAxisID:'y2', pointRadius:2, spanGaps:true }]}});
+        { label:'% grasa', data: D.body.map(r => r.body_fat_pct ? +r.body_fat_pct : null), borderColor: C.s1, pointRadius:2, spanGaps:true },
+        { label:'Músculo kg', data: D.body.map(r => r.muscle_mass_kg ? +r.muscle_mass_kg : null), borderColor: C.s2, yAxisID:'y2', pointRadius:2, spanGaps:true }]}});
 }
 if (M === 'carga') {
     const days = D.daily.map(r => r.day.slice(5));
     new Chart(ch1, { type:'line', options:{ scales:{ y2:{position:'right',min:0,max:100,grid:{display:false}} } }, data: { labels: days, datasets: [
-        { label:'FC reposo', data: D.daily.map(r => r.resting_hr), borderColor: C.red, pointRadius:2, spanGaps:true },
-        { label:'Estrés medio', data: D.daily.map(r => r.avg_stress), borderColor: C.yellow, yAxisID:'y2', pointRadius:2, spanGaps:true }]}});
+        { label:'FC reposo', data: D.daily.map(r => r.resting_hr), borderColor: C.s1, pointRadius:2, spanGaps:true },
+        { label:'Estrés medio', data: D.daily.map(r => r.avg_stress), borderColor: C.s2, yAxisID:'y2', pointRadius:2, spanGaps:true }]}});
     const hd = Object.fromEntries(D.hrv.map(r => [r.day, r]));
     const hv = k => D.daily.map(r => hd[r.day] ? hd[r.day][k] : null);
     new Chart(ch2, { type:'line', data: { labels: days, datasets: [
-        { label:'Base alta', data: hv('baseline_high_ms'), borderColor:'transparent', backgroundColor:'rgba(138,154,123,.15)', fill:'+1', pointRadius:0 },
+        { label:'Base alta', data: hv('baseline_high_ms'), borderColor:'transparent', backgroundColor:'rgba(57,135,229,.22)', fill:'+1', pointRadius:0 },
         { label:'Base baja', data: hv('baseline_low_ms'), borderColor:'transparent', pointRadius:0 },
-        { label:'HRV', data: hv('last_night_avg_ms'), borderColor: C.green, pointRadius:3 }]},
+        { label:'HRV', data: hv('last_night_avg_ms'), borderColor: C.s1, pointRadius:3 }]},
         options:{ plugins:{ legend:{ labels:{ filter: i => i.text === 'HRV' } } } }});
     new Chart(ch3, { type:'bar', options:{ scales:{ x:{stacked:true}, y:{stacked:true} } }, data: {
         labels: D.intensity.map(r => r.week_start.slice(5)),
         datasets: [
-            { label:'Moderados', data: D.intensity.map(r => +r.moderate), backgroundColor: C.blue },
-            { label:'Vigorosos ×2', data: D.intensity.map(r => +r.vigorous2), backgroundColor: C.green }]}});
+            { label:'Moderados', data: D.intensity.map(r => +r.moderate), backgroundColor: C.s1 },
+            { label:'Vigorosos ×2', data: D.intensity.map(r => +r.vigorous2), backgroundColor: C.s2 }]}});
 }
 </script>
 {% endblock %}
