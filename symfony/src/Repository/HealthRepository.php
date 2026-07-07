@@ -30,11 +30,12 @@ final class HealthRepository
         );
     }
 
-    /** Sueño (duración, score, fases, HRV nocturno). */
+    /** Sueño (duración, score, fases, HRV nocturno, respiración y SpO2). */
     public function sleep(\DateTimeInterface $from, \DateTimeInterface $to): array
     {
         return $this->db->fetchAllAssociative(
-            'SELECT day, duration_s, score, deep_s, light_s, rem_s, awake_s, hrv_avg_ms
+            'SELECT day, duration_s, score, deep_s, light_s, rem_s, awake_s, hrv_avg_ms,
+                    respiration_avg, spo2_avg
              FROM garmin_sleep
              WHERE day BETWEEN :f AND :t
              ORDER BY day',
