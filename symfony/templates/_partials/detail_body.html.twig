@@ -53,11 +53,11 @@
             {% endfor %}
         </table>
     </div>
-    {# El grid iguala la altura de ambos paneles; la lista scrollea por dentro
-       (min-height:0 permite que el flex hijo encoja) en vez de fijar un alto. #}
+    {# height:0 + flex:1: la lista no aporta altura propia al grid (el heatmap
+       fija la del par de paneles) y scrollea dentro del espacio resultante. #}
     <div class="panel" style="display:flex; flex-direction:column">
         <h2>Pasos por día</h2>
-        <div style="overflow-y:auto; flex:1; min-height:0; max-height:60vh">
+        <div style="overflow-y:auto; flex:1; height:0">
         <table>
             <tr><th>Día</th><th>Pasos teléfono</th><th>Pasos Garmin</th><th>Objetivo</th><th>% objetivo</th></tr>
             {% for row in data.step_days %}
