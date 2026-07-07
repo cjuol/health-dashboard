@@ -1,0 +1,14 @@
+{% extends 'base_share.html.twig' %}
+{% block title %}Dashboard compartido{% endblock %}
+
+{% block body %}
+{% include '_partials/dashboard_body.html.twig' with {
+    routes: {activities: 'share_activities', detail: 'share_detail', activity_show: 'share_activity_show'},
+    route_params: {token: token},
+    sync: null,
+    steps_label: 'Pasos (último día)',
+    hrv_label: 'HRV',
+    sleep_label: 'Sueño (última noche del rango)',
+    range_note: 'Rango compartido',
+} %}
+{% endblock %}

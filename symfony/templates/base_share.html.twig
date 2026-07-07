@@ -1,0 +1,30 @@
+{# Layout de la vista de invitado de un enlace compartido. Nav reducida a
+   las tres vistas de solo lectura permitidas (dashboard/actividades/detalle):
+   nunca informes, perfil ni logout, y nunca el nav del propietario. #}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Vista compartida{% endblock %} · cjuol</title>
+    {% include '_partials/styles.html.twig' %}
+</head>
+<body>
+<header>
+    <h1>⛰ Salud — vista compartida</h1>
+    <nav>
+        <a href="{{ path('share_dashboard', {token: token}) }}" class="{{ app.current_route == 'share_dashboard' ? 'active' }}">Dashboard</a>
+        <a href="{{ path('share_activities', {token: token}) }}" class="{{ app.current_route starts with 'share_activit' ? 'active' }}">Actividades</a>
+        <a href="{{ path('share_detail', {token: token, metric: 'pasos'}) }}" class="{{ app.current_route == 'share_detail' ? 'active' }}">Detalle</a>
+        <span class="nav-session muted" style="font-size:.82rem; font-weight:500">
+            Vista compartida · {{ share.label }} · {{ share.date_from|date('d/m/Y') }}–{{ share.date_to|date('d/m/Y') }} · caduca {{ share.expires_at|date('d/m/Y H:i') }}
+        </span>
+    </nav>
+</header>
+<main>
+    {% for message in app.flashes('error') %}<div class="flash">{{ message }}</div>{% endfor %}
+    {% for message in app.flashes('success') %}<div class="flash flash-success">{{ message }}</div>{% endfor %}
+    {% block body %}{% endblock %}
+</main>
+</body>
+</html>

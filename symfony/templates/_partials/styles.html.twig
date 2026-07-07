@@ -1,0 +1,65 @@
+{# Hoja de estilos compartida (paleta Kanagawa Dragon) entre base.html.twig
+   (propietario) y base_share.html.twig (vista de invitado de un enlace
+   compartido), para no duplicarla entre ambos layouts. #}
+<style>
+    :root {
+        --bg: #181616; --bg2: #1f1d1d; --panel: #282727; --border: #393836;
+        --fg: #c5c9c5; --muted: #737c73;
+        /* Acento decorativo (no conlleva significado, solo estética de encabezados). */
+        --accent: #c4b28a;
+        /* Series de datos: orden fijo, misma identidad en todas las gráficas. */
+        --s1: #3987e5; --s2: #199e70; --s3: #c98500; --s4: #9085e9; --s5: #e66767;
+        /* Colores de estado: reservados para bien/aviso/crítico, nunca como color de serie. */
+        --ok: #0ca30c; --warn: #fab219; --crit: #d03b3b;
+        /* Alias de rol para enlaces (reutiliza la serie 1, no es un color de serie aquí). */
+        --link: var(--s1);
+    }
+    * { box-sizing: border-box; }
+    body {
+        margin: 0; background: var(--bg); color: var(--fg);
+        font: 15px/1.5 system-ui, -apple-system, sans-serif;
+    }
+    header {
+        display: flex; align-items: center; flex-wrap: wrap; gap: .8rem 1.5rem;
+        padding: .8rem 1.5rem; background: var(--bg2); border-bottom: 1px solid var(--border);
+    }
+    header h1 { font-size: 1rem; margin: 0; color: var(--accent); font-weight: 600; }
+    nav { display: flex; align-items: center; flex-wrap: wrap; gap: .3rem 1rem; flex: 1; min-width: 200px; }
+    nav a { color: var(--muted); text-decoration: none; }
+    /* Grupo de sesión agrupado: con flex-wrap, un margin-left:auto suelto
+       empuja por línea y separa Perfil de Salir al envolver. */
+    nav .nav-session { margin-left: auto; display: flex; gap: .3rem 1rem; }
+    nav a:hover, nav a.active { color: var(--fg); text-decoration: underline; }
+    @media (max-width: 640px) {
+        header { gap: .5rem 1rem; padding: .7rem 1rem; }
+        nav { gap: .25rem .7rem; font-size: .92rem; }
+        header h1 { font-size: .92rem; }
+    }
+    main { max-width: 1600px; margin: 0 auto; padding: 1.5rem; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .8rem; margin-bottom: 1.5rem; }
+    .card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: .9rem 1rem; }
+    .card .label { color: var(--muted); font-size: .78rem; text-transform: uppercase; letter-spacing: .05em; }
+    .card .value { font-size: 1.5rem; font-weight: 600; margin-top: .15rem; }
+    .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin-bottom: 1.2rem; overflow-x: auto; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; }
+    @media (max-width: 800px) { .grid2 { grid-template-columns: 1fr; } }
+    h2 { font-size: .95rem; color: var(--accent); margin: 0 0 .8rem; }
+    table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+    th, td { text-align: left; padding: .4rem .5rem; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-weight: 500; }
+    input, textarea, button {
+        background: var(--bg2); color: var(--fg); border: 1px solid var(--border);
+        border-radius: 6px; padding: .45rem .6rem; font: inherit;
+    }
+    button { cursor: pointer; background: var(--ok); color: var(--bg); border: 0; font-weight: 600; }
+    button:hover { filter: brightness(1.1); }
+    a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+        outline: 2px solid var(--s1); outline-offset: 2px; border-radius: 4px;
+    }
+    .muted { color: var(--muted); }
+    .ok { color: var(--ok); } .warn { color: var(--warn); } .err { color: var(--crit); }
+    form.inline { display: flex; gap: .6rem; align-items: end; flex-wrap: wrap; }
+    form.inline label { display: flex; flex-direction: column; gap: .2rem; font-size: .8rem; color: var(--muted); }
+    .flash { padding: .6rem 1rem; border-radius: 6px; margin-bottom: 1rem; background: var(--panel); border: 1px solid var(--crit); color: var(--crit); font-weight: 500; }
+    .flash.flash-success { border-color: var(--ok); color: var(--ok); }
+</style>

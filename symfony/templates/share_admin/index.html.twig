@@ -1,0 +1,49 @@
+{% extends 'base.html.twig' %}
+{% block title %}Compartir{% endblock %}
+
+{% block body %}
+<div class="panel">
+    <h2>Nuevo enlace</h2>
+    <form method="post" action="{{ path('share_create') }}" class="inline">
+        <input type="hidden" name="_token" value="{{ csrf_token('share_create') }}">
+        <label>Etiqueta <input type="text" name="label" placeholder="p.ej. Alex" required></label>
+        <label>Contraseña <input type="password" name="password" minlength="8" autocomplete="new-password" required></label>
+        <label>Desde <input type="date" name="date_from" required></label>
+        <label>Hasta <input type="date" name="date_to" required></label>
+        <label>Caduca <input type="datetime-local" name="expires_at" required></label>
+        <button type="submit">Crear enlace</button>
+    </form>
+    <p class="muted" style="margin-bottom:0">
+        La contraseña no se guarda en ningún sitio visible salvo el mensaje de confirmación al crear el enlace: compártela con el invitado por fuera de la app (WhatsApp, etc.). El rango de fechas queda fijo desde este momento, aunque más adelante se registren datos nuevos.
+    </p>
+</div>
+
+<div class="panel">
+    <h2>Enlaces ({{ links|length }})</h2>
+    <table>
+        <tr><th>Etiqueta</th><th>Estado</th><th>Rango</th><th>Caduca</th><th>URL</th><th></th></tr>
+        {% for l in links %}
+        {% set isRevoked = l.revoked_at is not null %}
+        {% set isExpired = not isRevoked and (l.expires_at|date('U')) < ('now'|date('U')) %}
+        {% set estado = isRevoked ? 'revocado' : (isExpired ? 'caducado' : 'activo') %}
+        <tr>
+            <td>{{ l.label }}</td>
+            <td class="{{ estado == 'activo' ? 'ok' : (estado == 'caducado' ? 'warn' : 'err') }}">{{ estado }}</td>
+            <td>{{ l.date_from|date('d/m/Y') }} → {{ l.date_to|date('d/m/Y') }}</td>
+            <td>{{ l.expires_at|date('d/m/Y H:i') }}</td>
+            <td><input type="text" readonly value="{{ absolute_url(path('share_entry', {token: l.token})) }}" style="width:100%; min-width:220px" onclick="this.select()"></td>
+            <td>
+                {% if not isRevoked %}
+                <form method="post" action="{{ path('share_revoke', {id: l.id}) }}" onsubmit="return confirm('¿Revocar el enlace de {{ l.label }}?')">
+                    <input type="hidden" name="_token" value="{{ csrf_token('share_revoke') }}">
+                    <button type="submit" style="background:var(--crit)">Revocar</button>
+                </form>
+                {% endif %}
+            </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="muted">Todavía no hay enlaces creados.</td></tr>
+        {% endfor %}
+    </table>
+</div>
+{% endblock %}

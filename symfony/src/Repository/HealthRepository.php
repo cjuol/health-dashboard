@@ -170,12 +170,27 @@ final class HealthRepository
     /** Estado de recuperación de hoy: última HRV y último sueño registrados. */
     public function recoveryToday(): array
     {
+        return $this->recoveryAsOf(new \DateTimeImmutable('today'));
+    }
+
+    /**
+     * Estado de recuperación a fecha de $day: última HRV y último sueño con
+     * day <= $day. Usada por el semáforo del propietario (con $day = hoy) y
+     * por el panel de invitado de un enlace compartido (con $day = último
+     * día del rango congelado), para no filtrar HRV/sueño posteriores al
+     * rango que el invitado no debería ver.
+     */
+    public function recoveryAsOf(\DateTimeInterface $day): array
+    {
+        $d = $day->format('Y-m-d');
         $hrv = $this->db->fetchAssociative(
             'SELECT day, last_night_avg_ms, status, baseline_low_ms, baseline_high_ms
-             FROM garmin_hrv ORDER BY day DESC LIMIT 1'
+             FROM garmin_hrv WHERE day <= :d ORDER BY day DESC LIMIT 1',
+            ['d' => $d],
         ) ?: null;
         $sleep = $this->db->fetchAssociative(
-            'SELECT day, duration_s, score FROM garmin_sleep ORDER BY day DESC LIMIT 1'
+            'SELECT day, duration_s, score FROM garmin_sleep WHERE day <= :d ORDER BY day DESC LIMIT 1',
+            ['d' => $d],
         ) ?: null;
 
         return ['hrv' => $hrv, 'sleep' => $sleep];
@@ -242,12 +257,22 @@ final class HealthRepository
         return $this->db->fetchAllAssociative($sql.' ORDER BY start_time DESC', $params);
     }
 
-    /** Tipos de actividad existentes (para el filtro del listado). */
-    public function activityTypes(): array
+    /**
+     * Tipos de actividad existentes (para el filtro del listado). Sin rango,
+     * devuelve todos los tipos (uso del propietario); con $from/$to, solo
+     * los tipos presentes en ese rango, para que el filtro de un invitado no
+     * ofrezca tipos de actividades fuera de su rango congelado.
+     */
+    public function activityTypes(?\DateTimeInterface $from = null, ?\DateTimeInterface $to = null): array
     {
-        return array_column($this->db->fetchAllAssociative(
-            'SELECT DISTINCT activity_type FROM garmin_activity ORDER BY 1'
-        ), 'activity_type');
+        $sql = 'SELECT DISTINCT activity_type FROM garmin_activity';
+        $params = [];
+        if (null !== $from && null !== $to) {
+            $sql .= " WHERE start_time >= :f AND start_time < (:t::date + INTERVAL '1 day')";
+            $params = ['f' => $from->format('Y-m-d'), 't' => $to->format('Y-m-d')];
+        }
+
+        return array_column($this->db->fetchAllAssociative($sql.' ORDER BY 1', $params), 'activity_type');
     }
 
     public function activityById(int $id): ?array

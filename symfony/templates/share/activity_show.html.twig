@@ -1,0 +1,10 @@
+{% extends 'base_share.html.twig' %}
+{% block title %}{{ a.activity_name }}{% endblock %}
+
+{% block body %}
+{% include '_partials/activity_show_body.html.twig' with {
+    routes: {activities: 'share_activities'},
+    route_params: {token: token},
+    back_label: '← Volver a actividades compartidas',
+} %}
+{% endblock %}

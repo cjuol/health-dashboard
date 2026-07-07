@@ -1,0 +1,9 @@
+{% extends 'base_share.html.twig' %}
+{% block title %}Detalle compartido · {{ metric }}{% endblock %}
+
+{% block body %}
+{% include '_partials/detail_body.html.twig' with {
+    routes: {detail: 'share_detail'},
+    route_params: {token: token},
+} %}
+{% endblock %}

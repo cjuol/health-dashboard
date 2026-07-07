@@ -1,0 +1,31 @@
+{# Formulario de contraseña del enlace compartido. Página independiente
+   (no extiende base_share.html.twig): el invitado todavía no tiene sesión
+   concedida, así que no debe ver la nav de las vistas de solo lectura. #}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vista compartida · cjuol</title>
+    {% include '_partials/styles.html.twig' %}
+    <style>
+        body { min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    </style>
+</head>
+<body>
+<div class="panel" style="width:100%; max-width:340px">
+    <h2 style="text-align:center">⛰ Vista compartida</h2>
+    <p class="muted" style="text-align:center; margin-top:-.4rem">
+        {{ share.label }}<br>{{ share.date_from|date('d/m/Y') }} – {{ share.date_to|date('d/m/Y') }}
+    </p>
+    {% for message in app.flashes('error') %}<div class="flash">{{ message }}</div>{% endfor %}
+    <form method="post" action="{{ path('share_check', {token: token}) }}" class="inline" style="flex-direction:column; align-items:stretch">
+        <input type="hidden" name="_token" value="{{ csrf_token('share_login') }}">
+        <label>Contraseña
+            <input type="password" name="password" autocomplete="current-password" required autofocus>
+        </label>
+        <button type="submit">Entrar</button>
+    </form>
+</div>
+</body>
+</html>

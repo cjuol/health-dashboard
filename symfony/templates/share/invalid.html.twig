@@ -1,0 +1,20 @@
+{# Página neutra para token inexistente, caducado o revocado: a propósito no
+   distingue el motivo, para no dar pistas sobre si el enlace existió. #}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enlace no disponible · cjuol</title>
+    {% include '_partials/styles.html.twig' %}
+    <style>
+        body { min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    </style>
+</head>
+<body>
+<div class="panel" style="width:100%; max-width:360px; text-align:center">
+    <h2>Enlace no válido o caducado</h2>
+    <p class="muted" style="margin-bottom:0">Comprueba el enlace o pide uno nuevo a quien te lo compartió.</p>
+</div>
+</body>
+</html>

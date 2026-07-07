@@ -30,4 +30,9 @@ security:
 
     access_control:
         - { path: ^/login, roles: PUBLIC_ACCESS }
+        # Zona de invitado de un enlace compartido: el token de 64 hex + la
+        # contraseña del enlace hacen de autenticación propia (ver
+        # ShareController), sin sesión de AppUser. La gestión de enlaces vive
+        # en /perfil/compartir, dentro del catch-all autenticado de abajo.
+        - { path: ^/compartir/, roles: PUBLIC_ACCESS }
         - { path: ^/, roles: IS_AUTHENTICATED_FULLY }
