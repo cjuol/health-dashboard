@@ -53,11 +53,20 @@
             {% endfor %}
         </table>
     </div>
-    {# height:0 + flex:1: la lista no aporta altura propia al grid (el heatmap
-       fija la del par de paneles) y scrollea dentro del espacio resultante. #}
-    <div class="panel" style="display:flex; flex-direction:column">
+    {# flex:1 + height:0 no sirve aquí: la fila de .grid2 no tiene alto
+       explícito (grid-auto-rows:auto), así que el grid mide la
+       *max-content contribution* de cada panel para fijar el alto de la
+       fila. flex-basis:0/height:0 solo se resuelven en el layout final,
+       una vez el contenedor ya tiene un alto definido — no participan en
+       ese cálculo intrínseco, así que el grid ve la tabla de 30 filas
+       "sin colapsar" y estira la fila (y el heatmap con ella) a esa
+       altura. max-height sí se respeta en el cálculo intrínseco, así que
+       calculamos aquí la altura real del heatmap (filas × 14px de celda
+       + spacing, más la cabecera) y la usamos como tope del scroll. #}
+    {% set heatmapContentHeight = (data.heatmap.rows|length + 1) * 14 + 1 %}
+    <div class="panel">
         <h2>Pasos por día</h2>
-        <div style="overflow-y:auto; flex:1; height:0">
+        <div style="overflow-y:auto; max-height:{{ heatmapContentHeight }}px">
         <table>
             <tr><th>Día</th><th>Pasos teléfono</th><th>Pasos Garmin</th><th>Objetivo</th><th>% objetivo</th></tr>
             {% for row in data.step_days %}
