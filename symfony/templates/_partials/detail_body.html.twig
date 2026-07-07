@@ -30,8 +30,10 @@
     <div class="panel">
         <h2>Mapa de calor: pasos por hora y día <span class="muted" style="font-weight:400">(azul = Garmin, ámbar = móvil — tus turnos se pintan solos)</span></h2>
         <div style="overflow-x:auto">
-        {# Celdas compactas pero etiquetas legibles: por debajo de ~9px el texto no se lee. #}
-        <table style="border-collapse:separate; border-spacing:1px; font-size:.6rem">
+        {# width:auto anula el table{width:100%} global: sin el, la primera
+           columna absorbe todo el ancho sobrante y la cuadricula queda
+           desplazada con un gran hueco a la izquierda. #}
+        <table style="border-collapse:separate; border-spacing:1px; font-size:.6rem; width:auto">
             <tr><th></th>{% for h in 0..23 %}<th class="muted" style="padding:0 1px; border:0">{{ h }}</th>{% endfor %}</tr>
             {% for day, hours in data.heatmap.rows %}
             <tr>
