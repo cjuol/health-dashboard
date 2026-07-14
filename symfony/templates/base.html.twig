@@ -15,6 +15,10 @@
         <a href="{{ path('activities') }}" class="{{ app.current_route starts with 'activit' ? 'active' }}">Actividades</a>
         <a href="{{ path('detail', {metric: 'pasos'}) }}" class="{{ app.current_route == 'detail' ? 'active' }}">Detalle</a>
         <a href="{{ path('report_index') }}" class="{{ app.current_route starts with 'report' ? 'active' }}">Informes</a>
+        <form method="post" action="{{ path('sync_garmin') }}" class="nav-sync">
+            <input type="hidden" name="_token" value="{{ csrf_token('sync-garmin') }}">
+            <button type="submit">⟳ Sync Garmin</button>
+        </form>
         <span class="nav-session">
             <a href="{{ path('share_admin') }}" class="{{ app.current_route starts with 'share_admin' ? 'active' }}">Compartir</a>
             <a href="{{ path('perfil_index') }}" class="{{ app.current_route starts with 'perfil' ? 'active' }}">Perfil</a>

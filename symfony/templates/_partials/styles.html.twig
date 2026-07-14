@@ -30,6 +30,14 @@
        empuja por línea y separa Perfil de Salir al envolver. */
     nav .nav-session { margin-left: auto; display: flex; gap: .3rem 1rem; }
     nav a:hover, nav a.active { color: var(--fg); text-decoration: underline; }
+    /* Botón de sync incrustado como <form> en el nav: se estiliza como un
+       enlace más (mismo tipo, color y padding) en vez de como botón. */
+    nav .nav-sync { display: inline-flex; margin: 0; }
+    nav .nav-sync button {
+        background: none; border: 0; padding: 0; margin: 0;
+        color: var(--muted); font: inherit; cursor: pointer;
+    }
+    nav .nav-sync button:hover { color: var(--fg); text-decoration: underline; }
     @media (max-width: 640px) {
         header { gap: .5rem 1rem; padding: .7rem 1rem; }
         nav { gap: .25rem .7rem; font-size: .92rem; }
