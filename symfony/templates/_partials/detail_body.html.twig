@@ -179,9 +179,10 @@ if (M === 'carga') {
     new Chart(ch1, { type:'line', options:{ scales:{ y2:{position:'right',min:0,max:100,grid:{display:false}} } }, data: { labels: days, datasets: [
         { label:'FC reposo', data: D.daily.map(r => r.resting_hr), borderColor: C.s1, pointRadius:2, spanGaps:true },
         { label:'Estrés medio', data: D.daily.map(r => r.avg_stress), borderColor: C.s2, yAxisID:'y2', pointRadius:2, spanGaps:true }]}});
+    const hDays = [...new Set([...D.daily.map(r => r.day), ...D.hrv.map(r => r.day)])].sort();
     const hd = Object.fromEntries(D.hrv.map(r => [r.day, r]));
-    const hv = k => D.daily.map(r => hd[r.day] ? hd[r.day][k] : null);
-    new Chart(ch2, { type:'line', data: { labels: days, datasets: [
+    const hv = k => hDays.map(day => hd[day] ? hd[day][k] : null);
+    new Chart(ch2, { type:'line', data: { labels: hDays.map(d => d.slice(5)), datasets: [
         { label:'Base alta', data: hv('baseline_high_ms'), borderColor:'transparent', backgroundColor:'rgba(57,135,229,.22)', fill:'+1', pointRadius:0 },
         { label:'Base baja', data: hv('baseline_low_ms'), borderColor:'transparent', pointRadius:0 },
         { label:'HRV', data: hv('last_night_avg_ms'), borderColor: C.s1, pointRadius:3 }]},
@@ -191,9 +192,10 @@ if (M === 'carga') {
         datasets: [
             { label:'Moderados', data: D.intensity.map(r => +r.moderate), backgroundColor: C.s1 },
             { label:'Vigorosos ×2', data: D.intensity.map(r => +r.vigorous2), backgroundColor: C.s2 }]}});
+    const vDays = [...new Set([...D.daily.map(r => r.day), ...D.vo2max.map(r => r.day)])].sort();
     const vd = Object.fromEntries(D.vo2max.map(r => [r.day, r]));
-    const vv = k => D.daily.map(r => vd[r.day] ? vd[r.day][k] : null);
-    new Chart(ch4, { type:'line', data: { labels: days, datasets: [
+    const vv = k => vDays.map(day => vd[day] ? vd[day][k] : null);
+    new Chart(ch4, { type:'line', data: { labels: vDays.map(d => d.slice(5)), datasets: [
         { label:'Carrera', data: vv('vo2max_running'), borderColor: C.s1, pointRadius:2, spanGaps:true },
         { label:'Ciclismo', data: vv('vo2max_cycling'), borderColor: C.s3, pointRadius:2, spanGaps:true }]}});
     new Chart(ch5, { type:'line', options:{ plugins:{ legend:{ display:false } } }, data: { labels: days, datasets: [
