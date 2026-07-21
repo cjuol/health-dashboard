@@ -26,6 +26,18 @@ final class MovementApiControllerTest extends WebTestCase
         // cada test) evita el "kernel booted twice" de WebTestCase.
         $this->client = static::createClient();
 
+        // El rate limiter (config/packages/rate_limiter.yaml) usa el pool
+        // dedicado cache.rate_limiter (no cache.app — Symfony crea uno
+        // propio para el componente rate-limiter), que es de filesystem y
+        // persiste ENTRE procesos/tests (ver bin/test.sh, que por eso limpia
+        // la caché antes de cada ejecución completa de la suite). Sin este
+        // clear() aquí, los tests de esta clase consumen acumulativamente el
+        // mismo cupo 'app' (15/min en when@test) porque no es por IP — si se
+        // ejecuta la clase dos veces en el mismo minuto (p.ej. con
+        // `phpunit --filter`, que se salta el clear de bin/test.sh), el
+        // cupo puede agotarse a mitad de suite y provocar 429 espurios.
+        static::getContainer()->get('cache.rate_limiter')->clear();
+
         $connection = static::getContainer()->get(Connection::class);
         $connection->executeStatement('DELETE FROM hc_movement_bucket');
         $connection->executeStatement('DELETE FROM sync_state');

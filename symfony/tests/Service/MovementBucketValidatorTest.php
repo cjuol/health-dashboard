@@ -3,6 +3,7 @@
 namespace App\Tests\Service;
 
 use App\Service\MovementBucketValidator;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class MovementBucketValidatorTest extends TestCase
@@ -251,5 +252,65 @@ final class MovementBucketValidatorTest extends TestCase
         ]));
 
         self::assertTrue($result['ok']);
+    }
+
+    /**
+     * @return iterable<string, array{0: string}>
+     */
+    public static function variableWidthFractionProvider(): iterable
+    {
+        // Java (Instant/OffsetDateTime#toString()) omite los ceros finales:
+        // el ancho de la fracción varía de 1 a 9 dígitos, nunca fijo a 6.
+        yield 'un dígito (décimas)' => ['.1'];
+        yield 'tres dígitos (milisegundos)' => ['.123'];
+        yield 'cinco dígitos' => ['.12345'];
+        yield 'nueve dígitos (nanosegundos, se truncan a microsegundos)' => ['.123456789'];
+    }
+
+    #[DataProvider('variableWidthFractionProvider')]
+    public function testFractionalSecondsOfVariableWidthAreAccepted(string $fraction): void
+    {
+        // Regresión: el round-trip de cinturón y tirantes comparaba contra
+        // el string ORIGINAL, pero format('u') siempre rellena a 6 dígitos
+        // — cualquier fracción que no tuviera exactamente 6 dígitos se
+        // rechazaba en falso con "no es una fecha ISO-8601 válida".
+        $result = $this->validator->validate($this->validBucket([
+            'bucket_start' => '2024-01-01T10:00:00'.$fraction.'+02:00',
+        ]));
+
+        self::assertTrue($result['ok'], \sprintf('la fracción "%s" debería aceptarse', $fraction));
+    }
+
+    public function testNineDigitFractionIsTruncatedToMicroseconds(): void
+    {
+        // No solo se acepta: los dígitos por debajo del microsegundo se
+        // truncan (no se redondean), igual que los perdería Postgres al
+        // guardar en timestamptz.
+        $result = $this->validator->validate($this->validBucket([
+            'bucket_start' => '2024-01-01T10:00:00.123456789+00:00',
+            'bucket_end' => '2024-01-01T10:15:00+00:00',
+        ]));
+
+        self::assertTrue($result['ok']);
+        self::assertSame('2024-01-01T10:00:00+00:00', $result['data']['bucket_start']);
+    }
+
+    public function testStepsAtInt32MaxBoundaryIsAccepted(): void
+    {
+        // Límite exacto de la columna INTEGER (hc_movement_bucket.steps):
+        // no debe rechazarse, solo lo que lo supera.
+        $result = $this->validator->validate($this->validBucket(['steps' => 2_147_483_647]));
+
+        self::assertTrue($result['ok']);
+        self::assertSame(2_147_483_647, $result['data']['steps']);
+    }
+
+    public function testDistanceAtNumeric10_2MaxBoundaryIsAccepted(): void
+    {
+        // Límite exacto de la columna NUMERIC(10,2) (hc_movement_bucket.distance_m).
+        $result = $this->validator->validate($this->validBucket(['distance_m' => 99_999_999.99]));
+
+        self::assertTrue($result['ok']);
+        self::assertSame(99_999_999.99, $result['data']['distance_m']);
     }
 }
