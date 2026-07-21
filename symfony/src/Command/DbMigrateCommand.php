@@ -23,8 +23,14 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
  * receta manual (`psql -f db/0N_x.sql`) por un runner que:
  *  - registra en la tabla `schema_migration` cada fichero ya aplicado, para
  *    no reaplicarlo en la siguiente ejecución;
- *  - aplica cada fichero pendiente dentro de su PROPIA transacción, así que
- *    si uno falla los anteriores quedan aplicados y registrados;
+ *  - aplica TODOS los ficheros pendientes de una misma ejecución dentro de
+ *    UNA ÚNICA transacción (incluidas las inserciones en
+ *    `schema_migration`): todo-o-nada. Si un fichero falla, la ejecución
+ *    entera se revierte y no queda ningún fichero de esa corrida aplicado
+ *    ni registrado — no hay una "ventana" a medias en la que un DROP de un
+ *    fichero ya quedó comprometido mientras el fichero que lo repara
+ *    todavía no se ha aplicado. Como el DDL de Postgres es transaccional
+ *    (nada en db/ usa CONCURRENTLY ni CREATE DATABASE), esto es seguro;
  *  - no depende de que la base esté vacía: como TODOS los ficheros de db/
  *    son idempotentes (CREATE ... IF NOT EXISTS / DROP ... IF EXISTS +
  *    CREATE), la primera vez que se ejecuta sobre una base ya poblada por
@@ -70,9 +76,10 @@ final class DbMigrateCommand extends Command
             )
             ->setHelp(
                 'Aplica en orden alfabético los ficheros *.sql de un directorio, saltando los que ya '.
-                'estén registrados en la tabla schema_migration (se crea sola si no existe). Cada '.
-                'fichero se aplica dentro de su propia transacción: si uno falla, se detiene ahí, '.
-                'informa qué fichero fue y deja intactos los registros de los ficheros anteriores.',
+                'estén registrados en la tabla schema_migration (se crea sola si no existe). Todos los '.
+                'ficheros pendientes de la ejecución se aplican dentro de UNA ÚNICA transacción '.
+                '(todo-o-nada): si uno falla, se revierte la ejecución entera y no queda ningún '.
+                'fichero de esa corrida aplicado ni registrado.',
             );
     }
 
@@ -116,42 +123,60 @@ final class DbMigrateCommand extends Command
             return Command::SUCCESS;
         }
 
-        $appliedCount = 0;
+        $pending = [];
+        $skippedCount = 0;
         foreach ($files as $path) {
             $filename = basename($path);
-
             $alreadyApplied = $connection->fetchOne(
                 'SELECT 1 FROM schema_migration WHERE filename = :filename',
                 ['filename' => $filename],
             );
             if (false !== $alreadyApplied) {
                 $io->writeln(sprintf('%s: omitido', $filename));
+                ++$skippedCount;
                 continue;
             }
+            $pending[$filename] = $path;
+        }
 
-            $sql = $this->stripOwnTransactionWrapper((string) file_get_contents($path));
+        if ([] === $pending) {
+            $io->success(sprintf('%d ficheros procesados, 0 aplicados, %d omitidos.', \count($files), $skippedCount));
 
-            $connection->beginTransaction();
-            try {
+            return Command::SUCCESS;
+        }
+
+        // Todos los ficheros pendientes de esta ejecución van en UNA ÚNICA
+        // transacción: si uno falla, se revierte la corrida entera (ver
+        // docblock de la clase). Esto evita la ventana en la que un DROP
+        // de un fichero ya queda comprometido mientras el fichero que
+        // recrea el objeto todavía no se ha aplicado (p.ej. una vista de
+        // la que depende el dashboard, ausente durante la corrida).
+        $connection->beginTransaction();
+        try {
+            foreach ($pending as $filename => $path) {
+                $sql = $this->stripOwnTransactionWrapper((string) file_get_contents($path));
                 $connection->executeStatement($sql);
                 $connection->insert('schema_migration', ['filename' => $filename]);
-                $connection->commit();
-            } catch (\Throwable $e) {
-                $connection->rollBack();
-                $io->error(sprintf('Fallo aplicando "%s": %s', $filename, $e->getMessage()));
-
-                return Command::FAILURE;
+                $io->writeln(sprintf('%s: aplicado', $filename));
             }
+            $connection->commit();
+        } catch (\Throwable $e) {
+            $connection->rollBack();
+            $io->error(sprintf(
+                'Fallo aplicando "%s": %s. Se ha revertido la ejecución completa: ningún fichero de '.
+                'esta corrida queda aplicado ni registrado.',
+                $filename ?? '?',
+                $e->getMessage(),
+            ));
 
-            $io->writeln(sprintf('%s: aplicado', $filename));
-            ++$appliedCount;
+            return Command::FAILURE;
         }
 
         $io->success(sprintf(
             '%d ficheros procesados, %d aplicados, %d omitidos.',
             \count($files),
-            $appliedCount,
-            \count($files) - $appliedCount,
+            \count($pending),
+            $skippedCount,
         ));
 
         return Command::SUCCESS;
@@ -159,18 +184,114 @@ final class DbMigrateCommand extends Command
 
     /**
      * Los ficheros db/*.sql traen su propio BEGIN;/COMMIT; para poder
-     * aplicarse también sueltos con `psql -f`. Aquí cada fichero se envuelve
-     * en NUESTRA propia transacción (para poder capturar el error de uno y
-     * decidir si seguimos con los demás), así que el BEGIN/COMMIT del propio
-     * fichero se retira antes de ejecutarlo: Postgres no admite abrir una
+     * aplicarse también sueltos con `psql -f`. Aquí el fichero se ejecuta
+     * dentro de NUESTRA propia transacción (ver execute()), así que su
+     * BEGIN/COMMIT se retira antes: Postgres no admite abrir una
      * transacción dentro de otra ya abierta.
+     *
+     * Todos los db/*.sql empiezan con un bloque de comentarios "-- ===",
+     * así que el BEGIN; nunca está en la primera línea literal del
+     * fichero: hay que saltar líneas en blanco y comentarios "--" antes de
+     * buscarlo. Es un escaneo línea a línea deliberadamente simple (NO un
+     * parser SQL completo): ignora BEGIN/COMMIT que aparezcan dentro de un
+     * cuerpo de función entre $$...$$ (db/01 y db/09 tienen funciones
+     * plpgsql/sql) para no confundirlos con la envoltura transaccional del
+     * propio fichero.
+     *
+     * Si tras retirar el BEGIN;/COMMIT; de la envoltura queda otro
+     * COMMIT; suelto a nivel superior (fuera de un cuerpo $$...$$), se
+     * aborta con un error claro en vez de ejecutarlo: indicaría contenido
+     * tras el COMMIT; final del fichero, lo que rompería la atomicidad por
+     * fichero que este runner garantiza.
      */
     private function stripOwnTransactionWrapper(string $sql): string
     {
-        $sql = trim($sql);
-        $sql = preg_replace('/^BEGIN\s*;/i', '', $sql, 1) ?? $sql;
-        $sql = preg_replace('/COMMIT\s*;\s*$/i', '', trim($sql), 1) ?? $sql;
+        $lines = explode("\n", $sql);
+        $insideDollarBody = $this->dollarBodyMaskPerLine($lines);
 
-        return trim($sql);
+        // 1) Retirar el primer BEGIN; que aparece en la primera línea
+        //    "significativa" (no en blanco, no comentario "--"), fuera de
+        //    un cuerpo $$...$$.
+        foreach ($lines as $i => $line) {
+            if ($insideDollarBody[$i]) {
+                continue;
+            }
+            $trimmed = trim($line);
+            if ('' === $trimmed || str_starts_with($trimmed, '--')) {
+                continue;
+            }
+            if (preg_match('/^BEGIN\s*;$/i', $trimmed)) {
+                unset($lines[$i]);
+            }
+            break;
+        }
+
+        // 2) Retirar el último COMMIT; que aparece en la última línea
+        //    "significativa" (recorriendo desde el final, saltando líneas
+        //    en blanco/comentario que puedan venir después), fuera de un
+        //    cuerpo $$...$$.
+        $indices = array_keys($lines);
+        for ($j = \count($indices) - 1; $j >= 0; --$j) {
+            $i = $indices[$j];
+            if ($insideDollarBody[$i]) {
+                continue;
+            }
+            $trimmed = trim($lines[$i]);
+            if ('' === $trimmed || str_starts_with($trimmed, '--')) {
+                continue;
+            }
+            if (preg_match('/^COMMIT\s*;$/i', $trimmed)) {
+                unset($lines[$i]);
+            }
+            break;
+        }
+
+        $result = trim(implode("\n", $lines));
+
+        // 3) Si queda un COMMIT; adicional a nivel superior, es una señal
+        //    de que hay contenido tras el COMMIT; final del fichero (o un
+        //    COMMIT; duplicado): abortar en vez de ejecutar SQL que
+        //    rompería la atomicidad por fichero.
+        $remainingLines = explode("\n", $result);
+        $insideDollarBody = $this->dollarBodyMaskPerLine($remainingLines);
+        foreach ($remainingLines as $i => $line) {
+            if ($insideDollarBody[$i]) {
+                continue;
+            }
+            $trimmed = trim($line);
+            if (preg_match('/^COMMIT\s*;(\s*--.*)?$/i', $trimmed)) {
+                throw new \RuntimeException(
+                    'El fichero contiene un COMMIT; adicional fuera de la envoltura transaccional '.
+                    'estándar (tras retirar BEGIN;/COMMIT;). Revísalo antes de aplicarlo: ejecutarlo '.
+                    'tal cual rompería la atomicidad por fichero que garantiza este runner.',
+                );
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * Para cada línea, indica si el escaneo entra en ella ya "dentro" de un
+     * cuerpo $$...$$ (antes de aplicar los toggles de esa propia línea).
+     * Solo contempla el delimitador simple "$$" (sin tag), que es el único
+     * que usa este proyecto — no un parser genérico de dollar-quoting.
+     *
+     * @param list<string> $lines
+     *
+     * @return array<int, bool>
+     */
+    private function dollarBodyMaskPerLine(array $lines): array
+    {
+        $mask = [];
+        $inside = false;
+        foreach ($lines as $i => $line) {
+            $mask[$i] = $inside;
+            if (1 === preg_match_all('/\$\$/', $line) % 2) {
+                $inside = !$inside;
+            }
+        }
+
+        return $mask;
     }
 }

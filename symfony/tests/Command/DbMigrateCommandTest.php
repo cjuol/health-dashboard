@@ -149,6 +149,59 @@ final class DbMigrateCommandTest extends KernelTestCase
         }
     }
 
+    public function testLegacyDatabaseWithRawFilesAndNoSchemaMigrationAppliesCleanlyOnFirstRun(): void
+    {
+        // Simula el escenario que motivó este test (ver README, sección
+        // migraciones): un VPS con la base inicializada a mano/por
+        // docker-entrypoint-initdb.d, donde db/*.sql ya se aplicó en bruto
+        // y schema_migration ni existe. La primera corrida del runner debe
+        // registrar todo sin tocar los datos ya presentes y sin dejar una
+        // ventana en la que las vistas de fusión falten (antes de este fix,
+        // con transacción por fichero, el DROP VIEW ... CASCADE de un
+        // fichero temprano podía tumbar v_weekly_summary hasta que un
+        // fichero posterior la recreaba).
+        $scratch = DriverManager::getConnection($this->connectionParams(self::SCRATCH_DB));
+        try {
+            foreach ($this->sqlFiles() as $file) {
+                $scratch->executeStatement((string) file_get_contents($file));
+            }
+
+            $scratch->insert('hc_movement_bucket', [
+                'bucket_start' => '2026-01-01 10:00:00+00',
+                'bucket_end' => '2026-01-01 10:15:00+00',
+                'origin' => 'legacy-marker',
+                'steps' => 321,
+            ]);
+        } finally {
+            $scratch->close();
+        }
+
+        [$exitCode] = $this->runMigrate();
+        self::assertSame(Command::SUCCESS, $exitCode);
+
+        $scratch = DriverManager::getConnection($this->connectionParams(self::SCRATCH_DB));
+        try {
+            $files = $this->sqlFiles();
+            $recorded = (int) $scratch->fetchOne('SELECT count(*) FROM schema_migration');
+            self::assertSame(\count($files), $recorded, 'todos los ficheros deberían quedar registrados');
+
+            $marker = $scratch->fetchOne(
+                "SELECT steps FROM hc_movement_bucket WHERE origin = 'legacy-marker'",
+            );
+            self::assertSame(321, (int) $marker, 'los datos ya presentes en la base no deberían perderse');
+
+            self::assertTrue($this->viewExists($scratch, 'v_weekly_summary'));
+            self::assertTrue($this->viewExists($scratch, 'v_steps_daily'));
+            // No basta con que existan: deben ser consultables (si alguna
+            // quedó a medias por una CASCADE mal gestionada, esto fallaría
+            // con un error de Postgres en vez de devolver un conteo).
+            self::assertIsNumeric($scratch->fetchOne('SELECT count(*) FROM v_weekly_summary'));
+            self::assertIsNumeric($scratch->fetchOne('SELECT count(*) FROM v_steps_daily'));
+        } finally {
+            $scratch->close();
+        }
+    }
+
     /**
      * @return array{0: int, 1: string} [exit code, salida de consola]
      */

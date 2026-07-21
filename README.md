@@ -53,6 +53,17 @@ App Android "HC Movimiento" ── POST /api/v1/... ───┘                
      está vacía y el runner reaplica TODOS los ficheros sin efecto
      destructivo — simplemente los deja registrados para las siguientes
      ejecuciones, que solo aplican lo nuevo.
+   - **Semántica todo-o-nada:** todos los ficheros pendientes de una misma
+     ejecución se aplican dentro de UNA ÚNICA transacción (incluido el
+     registro en `schema_migration`). Si uno falla, se revierte la
+     ejecución entera: no queda ningún fichero de esa corrida ni aplicado ni
+     registrado, y no hay una ventana intermedia en la que, por ejemplo, un
+     `DROP VIEW ... CASCADE` de un fichero temprano deje sin servicio una
+     vista de la que depende el dashboard mientras el fichero que la
+     recrea todavía no se ha aplicado.
+   - Si el cambio toca `Dockerfile` o la versión de PHP, `./bin/migrate.sh`
+     **no basta**: hay que reconstruir la imagen con
+     `docker compose up -d --build web` antes (o en vez) de `migrate.sh`.
 
 3. Crea el usuario del dashboard (una sola vez, o para cambiar la contraseña):
    `docker compose exec web php bin/console app:user:init` (sin `-T`, para
