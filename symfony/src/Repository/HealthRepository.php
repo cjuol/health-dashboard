@@ -158,11 +158,11 @@ final class HealthRepository
     public function dailyStepsBySource(\DateTimeInterface $from, \DateTimeInterface $to): array
     {
         return $this->db->fetchAllAssociative(
-            "SELECT (bucket_start AT TIME ZONE 'Europe/Madrid')::date AS day,
+            "SELECT (bucket_start AT TIME ZONE app_timezone())::date AS day,
                     SUM(steps) FILTER (WHERE source = 'garmin') AS garmin_steps,
                     SUM(steps) FILTER (WHERE source = 'phone')  AS phone_steps
              FROM v_steps_fused_15m
-             WHERE (bucket_start AT TIME ZONE 'Europe/Madrid')::date BETWEEN :f AND :t
+             WHERE (bucket_start AT TIME ZONE app_timezone())::date BETWEEN :f AND :t
              GROUP BY 1 ORDER BY 1",
             ['f' => $from->format('Y-m-d'), 't' => $to->format('Y-m-d')],
         );
@@ -219,13 +219,13 @@ final class HealthRepository
     public function stepsHeatmap(\DateTimeInterface $from, \DateTimeInterface $to): array
     {
         return $this->db->fetchAllAssociative(
-            "SELECT (bucket_start AT TIME ZONE 'Europe/Madrid')::date AS day,
-                    EXTRACT(HOUR FROM bucket_start AT TIME ZONE 'Europe/Madrid')::int AS hour,
+            "SELECT (bucket_start AT TIME ZONE app_timezone())::date AS day,
+                    EXTRACT(HOUR FROM bucket_start AT TIME ZONE app_timezone())::int AS hour,
                     SUM(steps) AS steps,
                     SUM(steps) FILTER (WHERE source = 'garmin') AS garmin_steps,
                     SUM(steps) FILTER (WHERE source = 'phone')  AS phone_steps
              FROM v_steps_fused_15m
-             WHERE (bucket_start AT TIME ZONE 'Europe/Madrid')::date BETWEEN :f AND :t
+             WHERE (bucket_start AT TIME ZONE app_timezone())::date BETWEEN :f AND :t
              GROUP BY 1, 2 ORDER BY 1, 2",
             ['f' => $from->format('Y-m-d'), 't' => $to->format('Y-m-d')],
         );

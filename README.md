@@ -114,6 +114,19 @@ petición: suficiente para rangos de 2–8 semanas). Para rangos largos, cambia
 el transporte en `config/packages/framework.yaml` a `doctrine://default` y
 arranca un worker: `php bin/console messenger:consume -vv`.
 
+## Zona horaria
+
+`docker-compose.yml` fija `TZ`/`PGTZ=Europe/Madrid` en los contenedores: eso
+solo afecta a cómo el sistema operativo y `now()`/`current_timestamp`
+formatean fechas, no al corte de día que usan las vistas de fusión de pasos
+ni las consultas del dashboard. Ese corte de día vive en una única función
+SQL, `app_timezone()` (`db/09_timezone.sql`), que usan `v_steps_daily_fused`,
+`v_weekly_summary`, los índices `idx_garmin_bucket_day`/`idx_hc_bucket_day` y
+`HealthRepository.php`. Para cambiar la zona horaria de la app: edita el
+literal de `app_timezone()`, reaplica `db/09_timezone.sql` y reconstruye los
+dos índices (`REINDEX INDEX idx_garmin_bucket_day;` / `idx_hc_bucket_day`) —
+ver el comentario de cabecera de ese fichero para el detalle.
+
 ## Desarrollo sin Docker
 
 ```bash

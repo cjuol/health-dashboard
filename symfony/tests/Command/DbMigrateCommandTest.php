@@ -111,6 +111,44 @@ final class DbMigrateCommandTest extends KernelTestCase
         }
     }
 
+    public function testAppTimezoneFunctionReturnsMadridAndDailyFusionStaysConsistent(): void
+    {
+        $this->runMigrate();
+
+        $scratch = DriverManager::getConnection($this->connectionParams(self::SCRATCH_DB));
+        try {
+            self::assertSame('Europe/Madrid', $scratch->fetchOne('SELECT app_timezone()'));
+
+            // 23:45 UTC del 15 de enero cae ya en el 16 en Europe/Madrid
+            // (UTC+1 en invierno): el caso exacto que motivó fijar zona
+            // horaria explícita en el corte de día (ver db/02_fixes.sql,
+            // FIX 3). Prueba que v_steps_daily_fused, ahora sobre
+            // app_timezone(), sigue devolviendo el mismo día que con el
+            // literal 'Europe/Madrid' anterior.
+            $bucketStart = '2026-01-15 23:45:00+00';
+            $scratch->insert('garmin_steps_bucket', [
+                'bucket_start' => $bucketStart,
+                'bucket_end' => '2026-01-16 00:00:00+00',
+                'steps' => 123,
+            ]);
+
+            $day = $scratch->fetchOne(
+                "SELECT day FROM v_steps_daily_fused WHERE day = DATE '2026-01-16'",
+            );
+            self::assertSame('2026-01-16', $day);
+
+            // Mismo resultado que calculando el corte de día a mano con el
+            // literal anterior: la migración no cambió el comportamiento.
+            $expected = $scratch->fetchOne(
+                "SELECT (:b::timestamptz AT TIME ZONE 'Europe/Madrid')::date",
+                ['b' => $bucketStart],
+            );
+            self::assertSame('2026-01-16', $expected);
+        } finally {
+            $scratch->close();
+        }
+    }
+
     /**
      * @return array{0: int, 1: string} [exit code, salida de consola]
      */
