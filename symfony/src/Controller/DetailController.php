@@ -12,7 +12,7 @@ use Symfony\Component\Routing\Attribute\Route;
  * Vistas de detalle: una métrica, rango libre, granularidad fina.
  *   /detalle/pasos   — apilado por fuente + heatmap día×hora (turnos visibles)
  *   /detalle/sueno   — fases, score, respiración, SpO2
- *   /detalle/cuerpo  — peso, % grasa, masa muscular
+ *   /detalle/cuerpo  — peso, % grasa, masa muscular, % agua, masa ósea
  *   /detalle/carga   — FC reposo, estrés, HRV, minutos de intensidad, VO2max
  *   /actividades     — listado enriquecido (TE, carga, ritmo, SWOLF) con filtros
  *   /actividad/{id}  — sesión: zonas FC, parciales/laps, series de fuerza

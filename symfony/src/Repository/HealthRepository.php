@@ -72,7 +72,7 @@ final class HealthRepository
     public function bodyComposition(\DateTimeInterface $from, \DateTimeInterface $to): array
     {
         return $this->db->fetchAllAssociative(
-            'SELECT day, weight_kg, body_fat_pct, muscle_mass_kg
+            'SELECT day, weight_kg, body_fat_pct, muscle_mass_kg, body_water_pct, bone_mass_kg
              FROM garmin_body_composition
              WHERE day BETWEEN :f AND :t
              ORDER BY day',

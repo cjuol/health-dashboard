@@ -102,7 +102,7 @@
 {% elseif metric == 'cuerpo' %}
 <div class="grid2">
     <div class="panel"><h2>Peso</h2><canvas id="ch1"></canvas></div>
-    <div class="panel"><h2>% grasa y masa muscular</h2><canvas id="ch2"></canvas></div>
+    <div class="panel"><h2>% grasa, % agua, masa muscular y masa ósea</h2><canvas id="ch2"></canvas></div>
 </div>
 {% elseif metric == 'carga' %}
 <div class="grid2">
@@ -166,7 +166,9 @@ if (M === 'cuerpo') {
         { label:'Tendencia 7d', data: ma7, borderColor: C.s3, pointRadius:0, borderWidth:2.5, spanGaps:true }]}});
     new Chart(ch2, { type:'line', options:{ scales:{ y2:{position:'right',grid:{display:false}} } }, data: { labels: days, datasets: [
         { label:'% grasa', data: D.body.map(r => r.body_fat_pct ? +r.body_fat_pct : null), borderColor: C.s1, pointRadius:2, spanGaps:true },
-        { label:'Músculo kg', data: D.body.map(r => r.muscle_mass_kg ? +r.muscle_mass_kg : null), borderColor: C.s2, yAxisID:'y2', pointRadius:2, spanGaps:true }]}});
+        { label:'% agua', data: D.body.map(r => r.body_water_pct ? +r.body_water_pct : null), borderColor: C.s4, pointRadius:2, spanGaps:true },
+        { label:'Músculo kg', data: D.body.map(r => r.muscle_mass_kg ? +r.muscle_mass_kg : null), borderColor: C.s2, yAxisID:'y2', pointRadius:2, spanGaps:true },
+        { label:'Hueso kg', data: D.body.map(r => r.bone_mass_kg ? +r.bone_mass_kg : null), borderColor: C.s5, yAxisID:'y2', pointRadius:2, spanGaps:true }]}});
 }
 if (M === 'carga') {
     const days = D.daily.map(r => r.day.slice(5));
