@@ -28,7 +28,7 @@ $$ LANGUAGE plpgsql;
 --  NOTA: datos sensibles. Restringir acceso a la fila; considerar cifrado
 --  en reposo a nivel de columna/servidor.
 -- =============================================================================
-CREATE TABLE garmin_auth_token (
+CREATE TABLE IF NOT EXISTS garmin_auth_token (
     id                  SMALLINT     PRIMARY KEY DEFAULT 1,
     account_label       VARCHAR(64)  NOT NULL UNIQUE,
     oauth1_token        TEXT         NOT NULL,   -- JSON garth (oauth_token, secret, mfa_token, expires_at)
@@ -39,6 +39,7 @@ CREATE TABLE garmin_auth_token (
     updated_at          TIMESTAMPTZ  NOT NULL DEFAULT now(),
     CONSTRAINT one_row CHECK (id = 1)            -- fuerza fila única en mono-usuario
 );
+DROP TRIGGER IF EXISTS trg_auth_updated ON garmin_auth_token;
 CREATE TRIGGER trg_auth_updated BEFORE UPDATE ON garmin_auth_token
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
@@ -47,12 +48,13 @@ CREATE TRIGGER trg_auth_updated BEFORE UPDATE ON garmin_auth_token
 --  2. ESTADO DE SINCRONIZACIÓN
 --  lastSync de la app Android y última corrida del sidecar de Garmin.
 -- =============================================================================
-CREATE TABLE sync_state (
+CREATE TABLE IF NOT EXISTS sync_state (
     key         VARCHAR(64)  PRIMARY KEY,        -- p.ej. 'hc_app_last_sync', 'garmin_sidecar_last_run'
     value_ts    TIMESTAMPTZ,
     value_text  TEXT,
     updated_at  TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
+DROP TRIGGER IF EXISTS trg_sync_updated ON sync_state;
 CREATE TRIGGER trg_sync_updated BEFORE UPDATE ON sync_state
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
@@ -63,7 +65,7 @@ CREATE TRIGGER trg_sync_updated BEFORE UPDATE ON sync_state
 --  <= ese día. Cambiar de meta no altera el histórico. La meta de Garmin
 --  (que además se auto-ajusta a diario) se ignora por completo.
 -- =============================================================================
-CREATE TABLE step_goal (
+CREATE TABLE IF NOT EXISTS step_goal (
     valid_from  DATE         PRIMARY KEY,
     daily_goal  INTEGER      NOT NULL CHECK (daily_goal > 0),
     note        VARCHAR(255),
@@ -72,7 +74,8 @@ CREATE TABLE step_goal (
 
 -- Semilla por defecto (ajústala a tu gusto)
 INSERT INTO step_goal (valid_from, daily_goal, note)
-VALUES (DATE '2000-01-01', 10000, 'Objetivo por defecto');
+VALUES (DATE '2000-01-01', 10000, 'Objetivo por defecto')
+ON CONFLICT (valid_from) DO NOTHING;
 
 
 -- =============================================================================
@@ -81,7 +84,7 @@ VALUES (DATE '2000-01-01', 10000, 'Objetivo por defecto');
 --  'complete' no se vuelve a descargar; el sidecar re-lee los últimos 2-3 días
 --  (Garmin recalcula sueño/HRV hasta 24-48h después).
 -- =============================================================================
-CREATE TABLE garmin_daily (
+CREATE TABLE IF NOT EXISTS garmin_daily (
     day                     DATE         PRIMARY KEY,
     steps                   INTEGER,
     distance_m              NUMERIC(10,2),
@@ -99,7 +102,8 @@ CREATE TABLE garmin_daily (
     fetched_at              TIMESTAMPTZ  NOT NULL DEFAULT now(),
     updated_at              TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_garmin_daily_status ON garmin_daily (status);
+CREATE INDEX IF NOT EXISTS idx_garmin_daily_status ON garmin_daily (status);
+DROP TRIGGER IF EXISTS trg_daily_updated ON garmin_daily;
 CREATE TRIGGER trg_daily_updated BEFORE UPDATE ON garmin_daily
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
@@ -107,7 +111,7 @@ CREATE TRIGGER trg_daily_updated BEFORE UPDATE ON garmin_daily
 -- =============================================================================
 --  4. GARMIN — SUEÑO
 -- =============================================================================
-CREATE TABLE garmin_sleep (
+CREATE TABLE IF NOT EXISTS garmin_sleep (
     day             DATE         PRIMARY KEY,
     duration_s      INTEGER,
     score           INTEGER,     -- puntuación propietaria (no existe en Health Connect)
@@ -122,6 +126,7 @@ CREATE TABLE garmin_sleep (
     fetched_at      TIMESTAMPTZ  NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
+DROP TRIGGER IF EXISTS trg_sleep_updated ON garmin_sleep;
 CREATE TRIGGER trg_sleep_updated BEFORE UPDATE ON garmin_sleep
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
@@ -129,7 +134,7 @@ CREATE TRIGGER trg_sleep_updated BEFORE UPDATE ON garmin_sleep
 -- =============================================================================
 --  5. GARMIN — HRV
 -- =============================================================================
-CREATE TABLE garmin_hrv (
+CREATE TABLE IF NOT EXISTS garmin_hrv (
     day                 DATE         PRIMARY KEY,
     last_night_avg_ms   INTEGER,
     last_night_high_ms  INTEGER,
@@ -141,6 +146,7 @@ CREATE TABLE garmin_hrv (
     fetched_at          TIMESTAMPTZ  NOT NULL DEFAULT now(),
     updated_at          TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
+DROP TRIGGER IF EXISTS trg_hrv_updated ON garmin_hrv;
 CREATE TRIGGER trg_hrv_updated BEFORE UPDATE ON garmin_hrv
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
@@ -148,7 +154,7 @@ CREATE TRIGGER trg_hrv_updated BEFORE UPDATE ON garmin_hrv
 -- =============================================================================
 --  6. GARMIN — VO2MAX
 -- =============================================================================
-CREATE TABLE garmin_vo2max (
+CREATE TABLE IF NOT EXISTS garmin_vo2max (
     day               DATE         PRIMARY KEY,
     vo2max_running    NUMERIC(5,2),
     vo2max_cycling    NUMERIC(5,2),
@@ -156,6 +162,7 @@ CREATE TABLE garmin_vo2max (
     fetched_at        TIMESTAMPTZ  NOT NULL DEFAULT now(),
     updated_at        TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
+DROP TRIGGER IF EXISTS trg_vo2_updated ON garmin_vo2max;
 CREATE TRIGGER trg_vo2_updated BEFORE UPDATE ON garmin_vo2max
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
@@ -163,7 +170,7 @@ CREATE TRIGGER trg_vo2_updated BEFORE UPDATE ON garmin_vo2max
 -- =============================================================================
 --  7. GARMIN — COMPOSICIÓN CORPORAL (báscula Index, si la hay)
 -- =============================================================================
-CREATE TABLE garmin_body_composition (
+CREATE TABLE IF NOT EXISTS garmin_body_composition (
     day             DATE         PRIMARY KEY,
     weight_kg       NUMERIC(5,2),
     bmi             NUMERIC(4,1),
@@ -175,6 +182,7 @@ CREATE TABLE garmin_body_composition (
     fetched_at      TIMESTAMPTZ  NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
+DROP TRIGGER IF EXISTS trg_body_updated ON garmin_body_composition;
 CREATE TRIGGER trg_body_updated BEFORE UPDATE ON garmin_body_composition
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
@@ -183,7 +191,7 @@ CREATE TRIGGER trg_body_updated BEFORE UPDATE ON garmin_body_composition
 --  8. GARMIN — ACTIVIDADES
 --  Inmutables por activity_id. La ventana rodante inserta las nuevas.
 -- =============================================================================
-CREATE TABLE garmin_activity (
+CREATE TABLE IF NOT EXISTS garmin_activity (
     activity_id     BIGINT       PRIMARY KEY,
     activity_type   VARCHAR(64),
     activity_name   VARCHAR(255),
@@ -200,8 +208,9 @@ CREATE TABLE garmin_activity (
     fetched_at      TIMESTAMPTZ  NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_activity_start ON garmin_activity (start_time);
-CREATE INDEX idx_activity_type  ON garmin_activity (activity_type);
+CREATE INDEX IF NOT EXISTS idx_activity_start ON garmin_activity (start_time);
+CREATE INDEX IF NOT EXISTS idx_activity_type  ON garmin_activity (activity_type);
+DROP TRIGGER IF EXISTS trg_activity_updated ON garmin_activity;
 CREATE TRIGGER trg_activity_updated BEFORE UPDATE ON garmin_activity
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
@@ -210,7 +219,7 @@ CREATE TRIGGER trg_activity_updated BEFORE UPDATE ON garmin_activity
 --  9. GARMIN — DETALLE DE FUERZA (series por actividad)
 --  No existe en Health Connect; solo vía API de Garmin.
 -- =============================================================================
-CREATE TABLE garmin_strength_set (
+CREATE TABLE IF NOT EXISTS garmin_strength_set (
     id              BIGSERIAL    PRIMARY KEY,
     activity_id     BIGINT       NOT NULL REFERENCES garmin_activity(activity_id) ON DELETE CASCADE,
     set_order       INTEGER      NOT NULL,
@@ -223,14 +232,14 @@ CREATE TABLE garmin_strength_set (
     raw             JSONB,
     UNIQUE (activity_id, set_order)
 );
-CREATE INDEX idx_strength_activity ON garmin_strength_set (activity_id);
+CREATE INDEX IF NOT EXISTS idx_strength_activity ON garmin_strength_set (activity_id);
 
 
 -- =============================================================================
 --  10. GARMIN — PASOS INTRADÍA (buckets de 15 min)
 --  Alineados a reloj (:00/:15/:30/:45). Fuente para la fusión con el móvil.
 -- =============================================================================
-CREATE TABLE garmin_steps_bucket (
+CREATE TABLE IF NOT EXISTS garmin_steps_bucket (
     bucket_start    TIMESTAMPTZ  PRIMARY KEY,   -- alineado a 15 min
     bucket_end      TIMESTAMPTZ  NOT NULL,
     steps           INTEGER      NOT NULL DEFAULT 0,
@@ -248,7 +257,7 @@ CREATE TABLE garmin_steps_bucket (
 --  Upsert idempotente por (bucket_start, origin): reenviar el último día
 --  solo refresca, no duplica.
 -- =============================================================================
-CREATE TABLE hc_movement_bucket (
+CREATE TABLE IF NOT EXISTS hc_movement_bucket (
     bucket_start    TIMESTAMPTZ  NOT NULL,       -- alineado a 15 min
     bucket_end      TIMESTAMPTZ  NOT NULL,
     origin          VARCHAR(191) NOT NULL,       -- dataOrigin.packageName
@@ -267,7 +276,20 @@ CREATE TABLE hc_movement_bucket (
 --  Regla: por cada bucket de 15 min, si Garmin tiene dato se usa Garmin;
 --  si no, se usa el móvil. Nunca se suman ambos en el mismo bucket → sin
 --  doble conteo en las horas en que llevas los dos.
+--
+--  CASCADE en v_steps_daily: db/04_mesociclo.sql y db/06_weekly_summary_fix.sql
+--  (aplicados después, en otro fichero) crean v_weekly_summary a partir de
+--  esta vista. En una base ya inicializada, reaplicar este fichero sin
+--  CASCADE falla con "cannot drop view v_steps_daily because other objects
+--  depend on it". El CASCADE se limita a v_steps_daily (el único de los tres
+--  con dependientes fuera de este bloque); 04/06 vuelven a crear
+--  v_weekly_summary más adelante en la misma pasada, así que el resultado
+--  final es idéntico.
 -- =============================================================================
+DROP VIEW IF EXISTS v_steps_daily CASCADE;
+DROP VIEW IF EXISTS v_steps_daily_fused;
+DROP VIEW IF EXISTS v_steps_fused_15m;
+
 CREATE VIEW v_steps_fused_15m AS
 WITH phone AS (
     SELECT bucket_start,

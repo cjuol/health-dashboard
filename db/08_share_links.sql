@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS share_link (
 );
 
 -- set_updated_at() ya existe (definida en 01_schema.sql): se reutiliza aquí.
+DROP TRIGGER IF EXISTS trg_share_link_updated ON share_link;
 CREATE TRIGGER trg_share_link_updated BEFORE UPDATE ON share_link
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 

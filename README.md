@@ -38,12 +38,21 @@ App Android "HC Movimiento" ── POST /api/v1/... ───┘                
 
 2. `docker compose up -d --build`
    - En el **primer** arranque, Postgres ejecuta todos los `db/*.sql` en
-     orden alfabético, incluido `db/07_users.sql` (usuario del dashboard +
-     medidas corporales).
+     orden alfabético (incluidos `db/07_users.sql` y `db/08_share_links.sql`)
+     vía `docker-entrypoint-initdb.d`.
    - Si la base ya existía (VPS en producción, volumen ya inicializado),
-     `docker-entrypoint-initdb.d` **no** vuelve a ejecutarse: aplica a mano
-     cualquier `db/*.sql` nuevo, por ejemplo:
-     `docker compose exec -T db psql -U health -d health < db/07_users.sql`.
+     `docker-entrypoint-initdb.d` **no** vuelve a ejecutarse: aplica los
+     ficheros nuevos con el runner de migraciones, `./bin/migrate.sh` desde
+     la raíz del repo. Es el flujo habitual tras traer cambios de `db/`:
+     `git pull && ./bin/migrate.sh`.
+   - El runner (`app:db:migrate`) registra cada fichero aplicado en la tabla
+     `schema_migration` y salta los que ya están registrados. Todos los
+     ficheros de `db/` son idempotentes (`CREATE ... IF NOT EXISTS`,
+     `DROP ... IF EXISTS` + `CREATE`): la primera vez que se ejecuta sobre
+     una base ya poblada por `docker-entrypoint-initdb.d`, `schema_migration`
+     está vacía y el runner reaplica TODOS los ficheros sin efecto
+     destructivo — simplemente los deja registrados para las siguientes
+     ejecuciones, que solo aplican lo nuevo.
 
 3. Crea el usuario del dashboard (una sola vez, o para cambiar la contraseña):
    `docker compose exec web php bin/console app:user:init` (sin `-T`, para

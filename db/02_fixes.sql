@@ -35,8 +35,14 @@ ALTER TABLE hc_movement_bucket
 -- También: se expone distance_m (la CTE original la calculaba y la tiraba)
 -- y el corte de día usa zona explícita (con sesión en UTC, los pasos de
 -- 22:00–00:00 CEST caían en el día equivocado).
+--
+-- CASCADE en v_steps_daily: en una base ya inicializada, v_weekly_summary
+-- (db/04_mesociclo.sql, reemplazada luego por db/06_weekly_summary_fix.sql)
+-- ya depende de esta vista, y un DROP sin CASCADE falla. 04/06 la vuelven a
+-- crear más adelante en la misma pasada, así que el resultado final no
+-- cambia (ver el mismo razonamiento en db/01_schema.sql).
 -- -----------------------------------------------------------------------------
-DROP VIEW IF EXISTS v_steps_daily;
+DROP VIEW IF EXISTS v_steps_daily CASCADE;
 DROP VIEW IF EXISTS v_steps_daily_fused;
 DROP VIEW IF EXISTS v_steps_fused_15m;
 

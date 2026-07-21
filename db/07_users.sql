@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS app_user (
 );
 
 -- set_updated_at() ya existe (definida en 01_schema.sql): se reutiliza aquí.
+DROP TRIGGER IF EXISTS trg_app_user_updated ON app_user;
 CREATE TRIGGER trg_app_user_updated BEFORE UPDATE ON app_user
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
@@ -46,6 +47,7 @@ CREATE TABLE IF NOT EXISTS body_measurement (
     updated_at     TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
 
+DROP TRIGGER IF EXISTS trg_body_measurement_updated ON body_measurement;
 CREATE TRIGGER trg_body_measurement_updated BEFORE UPDATE ON body_measurement
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 

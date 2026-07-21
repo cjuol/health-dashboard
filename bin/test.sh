@@ -5,8 +5,10 @@
 # contenedor health-dashboard-web-1. Este script:
 #   1. Recrea la base de datos health_test desde cero.
 #   2. Aplica los scripts de db/ en orden (mismo esquema que producción).
-#   3. Copia el código fuente actual (src, tests, config, templates,
-#      phpunit.xml.dist, composer.json/.lock) al contenedor.
+#   3. Copia el código fuente actual (src, tests, config, templates, db,
+#      phpunit.xml.dist, composer.json/.lock) al contenedor. db/ se copia
+#      también porque DbMigrateCommandTest ejercita el runner app:db:migrate
+#      contra los ficheros reales del repo (no un fixture aparte).
 #   4. Instala las dependencias de desarrollo si hace falta (vendor/bin/phpunit
 #      no persiste si el contenedor se reconstruye desde la imagen).
 #   5. Lanza PHPUnit con APP_ENV=test y DATABASE_URL apuntando a health_test.
@@ -50,6 +52,7 @@ docker cp "$REPO_ROOT/symfony/src" "$WEB_CONTAINER:/var/www/html/"
 docker cp "$REPO_ROOT/symfony/tests" "$WEB_CONTAINER:/var/www/html/"
 docker cp "$REPO_ROOT/symfony/config" "$WEB_CONTAINER:/var/www/html/"
 docker cp "$REPO_ROOT/symfony/templates" "$WEB_CONTAINER:/var/www/html/"
+docker cp "$REPO_ROOT/db" "$WEB_CONTAINER:/var/www/html/"
 docker cp "$REPO_ROOT/symfony/phpunit.xml.dist" "$WEB_CONTAINER:/var/www/html/phpunit.xml.dist"
 docker cp "$REPO_ROOT/symfony/composer.json" "$WEB_CONTAINER:/var/www/html/composer.json"
 if [ -f "$REPO_ROOT/symfony/composer.lock" ]; then
