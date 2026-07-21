@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Service\MovementBucketValidator;
 use Doctrine\DBAL\Connection;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -24,9 +25,16 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  */
 final class MovementApiController
 {
+    // Límites de saneamiento: el cliente Android manda como mucho un día
+    // completo en buckets de 15 min (96 buckets), así que 5000 da margen de
+    // sobra sin dejar la puerta abierta a lotes arbitrariamente grandes.
+    private const MAX_BODY_BYTES = 2 * 1024 * 1024;
+    private const MAX_BUCKETS = 5000;
+
     public function __construct(
         private readonly Connection $db,
         private readonly HttpClientInterface $http,
+        private readonly MovementBucketValidator $validator,
         #[Autowire(env: 'MOVEMENT_API_TOKEN')]
         private readonly string $apiToken,
         #[Autowire(env: 'SIDECAR_URL')]
@@ -48,9 +56,25 @@ final class MovementApiController
             return new JsonResponse(['error' => 'unauthorized'], 401);
         }
 
-        $payload = json_decode($request->getContent(), true);
+        // El Content-Type puede traer parámetros ("; charset=utf-8"): solo
+        // nos importa el mime type.
+        $mimeType = strtolower(trim(explode(';', $request->headers->get('Content-Type', ''))[0]));
+        if ('application/json' !== $mimeType) {
+            return new JsonResponse(['error' => 'se requiere Content-Type: application/json'], 415);
+        }
+
+        $body = $request->getContent();
+        if (\strlen($body) > self::MAX_BODY_BYTES) {
+            return new JsonResponse(['error' => 'cuerpo demasiado grande (máximo 2 MB)'], 413);
+        }
+
+        $payload = json_decode($body, true);
         if (!\is_array($payload) || !\is_array($payload['buckets'] ?? null)) {
             return new JsonResponse(['error' => 'cuerpo inválido: se espera {device, buckets[]}'], 422);
+        }
+
+        if (\count($payload['buckets']) > self::MAX_BUCKETS) {
+            return new JsonResponse(['error' => 'demasiados buckets en el lote (máximo 5000)'], 413);
         }
 
         $device = \is_string($payload['device'] ?? null) ? mb_substr($payload['device'], 0, 64) : null;
@@ -70,19 +94,35 @@ final class MovementApiController
             SQL;
 
         $upserted = 0;
+        $rejected = [];
         $this->db->beginTransaction();
         try {
             foreach ($payload['buckets'] as $b) {
-                if (!isset($b['bucket_start'], $b['bucket_end'], $b['origin'])) {
-                    continue; // bucket malformado: se ignora sin tumbar el lote
+                if (!\is_array($b)) {
+                    $rejected[] = ['bucket_start' => null, 'reason' => 'el bucket no es un objeto válido'];
+                    continue;
                 }
+
+                $result = $this->validator->validate($b);
+                if (!$result['ok']) {
+                    // Bucket inválido: no se upsertea, pero tampoco se descarta
+                    // en silencio — se reporta con el motivo para que la app
+                    // pueda decidir si reintenta o descarta el dato.
+                    $rejected[] = [
+                        'bucket_start' => $b['bucket_start'] ?? null,
+                        'reason' => $result['reason'],
+                    ];
+                    continue;
+                }
+
+                $data = $result['data'];
                 $this->db->executeStatement($sql, [
-                    'bucket_start' => $b['bucket_start'],   // ISO-8601 con offset → timestamptz
-                    'bucket_end'   => $b['bucket_end'],
-                    'origin'       => mb_substr((string) $b['origin'], 0, 191),
-                    'steps'        => (int) ($b['steps'] ?? 0),
-                    'distance_m'   => isset($b['distance_m']) ? (float) $b['distance_m'] : null,
-                    'floors'       => isset($b['floors']) ? (int) $b['floors'] : null,
+                    'bucket_start' => $data['bucket_start'],
+                    'bucket_end'   => $data['bucket_end'],
+                    'origin'       => $data['origin'],
+                    'steps'        => $data['steps'],
+                    'distance_m'   => $data['distance_m'],
+                    'floors'       => $data['floors'],
                     'device'       => $device,
                 ]);
                 ++$upserted;
@@ -100,7 +140,7 @@ final class MovementApiController
 
         $this->triggerGarminSync();
 
-        return new JsonResponse(['upserted' => $upserted]);
+        return new JsonResponse(['upserted' => $upserted, 'rejected' => $rejected]);
     }
 
     /**
