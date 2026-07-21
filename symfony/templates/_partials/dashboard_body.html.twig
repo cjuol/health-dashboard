@@ -9,6 +9,7 @@
      routes         — {activities, detail, activity_show}: nombres de ruta
      route_params   — parámetros base para path() (p.ej. {token: ...} en la vista de invitado)
      sync           — estado de sincronización o null (el invitado nunca lo ve)
+     diagnostics    — diagnóstico de dispositivos o null (el invitado nunca lo ve)
      steps_label, hrv_label, sleep_label — textos de tarjeta, opcionales
      range_note     — texto de la leyenda del pie de las gráficas, opcional
 #}
@@ -79,6 +80,29 @@
         · Garmin: {{ sync['garmin_sidecar_last_run'] is defined ? sync['garmin_sidecar_last_run']|date('d/m H:i') : '—' }}
     </span>
     {% endif %}
+</div>
+{% endif %}
+
+{# ---------- Diagnóstico de dispositivos (solo propietario) ---------- #}
+{% if diagnostics is not null %}
+<div class="panel">
+    <h2>Diagnóstico de sincronización</h2>
+    <p class="muted" style="margin:0 0 .6rem">
+        App móvil: {{ diagnostics.sync['hc_app_last_sync'] is defined ? diagnostics.sync['hc_app_last_sync']|date('d/m/Y H:i') : '—' }}
+        · Garmin: {{ diagnostics.sync['garmin_sidecar_last_run'] is defined ? diagnostics.sync['garmin_sidecar_last_run']|date('d/m/Y H:i') : '—' }}
+    </p>
+    <table>
+        <tr><th>Dispositivo</th><th>Última recepción</th><th>Buckets (7 días)</th></tr>
+        {% for d in diagnostics.devices %}
+        <tr>
+            <td>{{ d.device }}</td>
+            <td>{{ d.last_received ? d.last_received|date('d/m/Y H:i') : '—' }}</td>
+            <td>{{ d.buckets_7d|number_format(0, ',', '.') }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="3" class="muted">Sin buckets registrados.</td></tr>
+        {% endfor %}
+    </table>
 </div>
 {% endif %}
 

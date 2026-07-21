@@ -99,6 +99,18 @@ cada día vinieron del móvil — visualiza directamente los turnos de cocina),
 sueño (horas + score), HRV con banda de línea base, FC en reposo y peso.
 Arriba se ve el último contacto de la app móvil y del sidecar de Garmin.
 
+La tabla "Pasos por día" de `/detalle/pasos` incluye también la distancia
+recorrida con el móvil (columna "Distancia móvil", agregada desde
+`v_steps_fused_15m.phone_distance_m`, expuesta desde `db/02_fixes.sql` pero
+sin usar hasta `db/10_phone_distance.sql`). El propietario ve además, en el
+dashboard, un panel "Diagnóstico de sincronización" con el último bucket
+recibido y el volumen de los últimos 7 días por dispositivo — nunca visible
+en un enlace compartido.
+
+> **Nota:** `hc_movement_bucket.floors` se guarda desde la ingesta pero
+> ningún endpoint ni vista del dashboard lo lee todavía; la app podría dejar
+> de enviarlo sin impacto visible.
+
 ## Informe PDF
 
 Pensado para la hoja de seguimiento de Alex: resumen del periodo (media de

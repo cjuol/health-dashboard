@@ -6,9 +6,10 @@
 
    Variables esperadas: metric, metrics, from, to, data, routes.detail, route_params
    Para metric == 'pasos', data también trae step_days: filas por día
-   (day, phone_steps, garmin_steps, daily_goal, pct_goal, goal_met) ya
-   fusionadas en el controlador a partir de dailySteps()+dailyStepsBySource(),
-   más recientes primero — usadas por la lista junto al heatmap.
+   (day, phone_steps, garmin_steps, phone_distance_m, daily_goal, pct_goal,
+   goal_met) ya fusionadas en el controlador a partir de
+   dailySteps()+dailyStepsBySource(), más recientes primero — usadas por la
+   lista junto al heatmap.
 #}
 <form class="inline panel" method="get">
     <nav style="display:flex; gap:.4rem; margin-right:auto">
@@ -68,17 +69,26 @@
         <h2>Pasos por día</h2>
         <div style="overflow-y:auto; max-height:{{ heatmapContentHeight }}px">
         <table>
-            <tr><th>Día</th><th>Pasos teléfono</th><th>Pasos Garmin</th><th>Objetivo</th><th>% objetivo</th></tr>
+            <tr><th>Día</th><th>Pasos teléfono</th><th>Distancia móvil</th><th>Pasos Garmin</th><th>Objetivo</th><th>% objetivo</th></tr>
             {% for row in data.step_days %}
             <tr>
                 <td>{{ row.day|date('d/m/Y') }}</td>
                 <td>{{ row.phone_steps|number_format(0, ',', '.') }}</td>
+                <td>
+                    {%- if row.phone_distance_m is null -%}
+                        —
+                    {%- elseif row.phone_distance_m >= 1000 -%}
+                        {{ (row.phone_distance_m / 1000)|number_format(1, ',') }} km
+                    {%- else -%}
+                        {{ row.phone_distance_m|number_format(0, ',', '.') }} m
+                    {%- endif -%}
+                </td>
                 <td>{{ row.garmin_steps|number_format(0, ',', '.') }}</td>
                 <td>{{ row.daily_goal|number_format(0, ',', '.') }}</td>
                 <td>{{ row.pct_goal|round(0, 'common') }} %{{ row.goal_met ? ' ✓' }}</td>
             </tr>
             {% else %}
-            <tr><td colspan="5" class="muted">Sin datos en este rango.</td></tr>
+            <tr><td colspan="6" class="muted">Sin datos en este rango.</td></tr>
             {% endfor %}
         </table>
         </div>

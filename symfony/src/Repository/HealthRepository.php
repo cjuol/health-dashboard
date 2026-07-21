@@ -154,13 +154,14 @@ final class HealthRepository
     // Dashboard v2: vista principal
     // -------------------------------------------------------------------------
 
-    /** Pasos por día desglosados por fuente (para la gráfica apilada). */
+    /** Pasos por día desglosados por fuente (para la gráfica apilada) + distancia recorrida con el móvil. */
     public function dailyStepsBySource(\DateTimeInterface $from, \DateTimeInterface $to): array
     {
         return $this->db->fetchAllAssociative(
             "SELECT (bucket_start AT TIME ZONE app_timezone())::date AS day,
                     SUM(steps) FILTER (WHERE source = 'garmin') AS garmin_steps,
-                    SUM(steps) FILTER (WHERE source = 'phone')  AS phone_steps
+                    SUM(steps) FILTER (WHERE source = 'phone')  AS phone_steps,
+                    SUM(phone_distance_m)                       AS phone_distance_m
              FROM v_steps_fused_15m
              WHERE (bucket_start AT TIME ZONE app_timezone())::date BETWEEN :f AND :t
              GROUP BY 1 ORDER BY 1",
@@ -323,6 +324,28 @@ final class HealthRepository
         );
 
         return array_column($rows, 'value_ts', 'key');
+    }
+
+    /**
+     * Diagnóstico de dispositivos: por cada `device` visto en
+     * hc_movement_bucket (null agrupado bajo 'desconocido'), cuándo se
+     * recibió el último bucket y cuántos llegaron en los últimos 7 días.
+     * Incluye además `syncStatus()` (reutilizada, no duplicada aquí) para
+     * dar un panel autocontenido con los últimos contactos de la app móvil
+     * y del sidecar de Garmin — solo para el propietario.
+     */
+    public function deviceDiagnostics(): array
+    {
+        $devices = $this->db->fetchAllAssociative(
+            "SELECT COALESCE(device, 'desconocido')                                  AS device,
+                    MAX(received_at)                                                 AS last_received,
+                    COUNT(*) FILTER (WHERE bucket_start >= now() - INTERVAL '7 days') AS buckets_7d
+             FROM hc_movement_bucket
+             GROUP BY 1
+             ORDER BY 1"
+        );
+
+        return ['devices' => $devices, 'sync' => $this->syncStatus()];
     }
 
     // -------------------------------------------------------------------------

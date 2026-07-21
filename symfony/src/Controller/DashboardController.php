@@ -66,6 +66,7 @@ final class DashboardController extends AbstractController
             'weekly' => $weekly,
             'week_targets' => $weekTargets,
             'sync' => $this->repo->syncStatus(),
+            'diagnostics' => $this->repo->deviceDiagnostics(),
             'activities' => \array_slice($activities, 0, 10),
             'series' => [
                 'steps' => $steps,

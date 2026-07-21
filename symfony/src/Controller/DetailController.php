@@ -128,6 +128,7 @@ final class DetailController extends AbstractController
                 'day' => $r['day'],
                 'phone_steps' => (int) ($s['phone_steps'] ?? 0),
                 'garmin_steps' => (int) ($s['garmin_steps'] ?? 0),
+                'phone_distance_m' => null !== ($s['phone_distance_m'] ?? null) ? (float) $s['phone_distance_m'] : null,
                 'daily_goal' => (int) $r['daily_goal'],
                 'pct_goal' => (float) $r['pct_goal'],
                 'goal_met' => (bool) $r['goal_met'],
