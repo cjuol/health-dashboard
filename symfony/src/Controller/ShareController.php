@@ -235,6 +235,7 @@ final class ShareController extends AbstractController
                 'daily' => $this->repo->garminDaily($from, $to),
                 'hrv' => $this->repo->hrv($from, $to),
                 'intensity' => $this->repo->weeklyIntensity($from, $to),
+                'vo2max' => $this->repo->vo2max($from, $to),
             ],
         };
         if ('pasos' === $metric) {

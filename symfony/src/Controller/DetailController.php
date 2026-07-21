@@ -13,7 +13,7 @@ use Symfony\Component\Routing\Attribute\Route;
  *   /detalle/pasos   — apilado por fuente + heatmap día×hora (turnos visibles)
  *   /detalle/sueno   — fases, score, respiración, SpO2
  *   /detalle/cuerpo  — peso, % grasa, masa muscular
- *   /detalle/carga   — FC reposo, estrés, HRV, minutos de intensidad
+ *   /detalle/carga   — FC reposo, estrés, HRV, minutos de intensidad, VO2max
  *   /actividades     — listado enriquecido (TE, carga, ritmo, SWOLF) con filtros
  *   /actividad/{id}  — sesión: zonas FC, parciales/laps, series de fuerza
  */
@@ -42,6 +42,7 @@ final class DetailController extends AbstractController
                 'daily' => $this->repo->garminDaily($from, $to),
                 'hrv' => $this->repo->hrv($from, $to),
                 'intensity' => $this->repo->weeklyIntensity($from, $to),
+                'vo2max' => $this->repo->vo2max($from, $to),
             ],
         };
         if ('pasos' === $metric) {

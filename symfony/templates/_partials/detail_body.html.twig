@@ -110,6 +110,7 @@
     <div class="panel"><h2>HRV</h2><canvas id="ch2"></canvas></div>
 </div>
 <div class="panel"><h2>Minutos de intensidad / semana</h2><canvas id="ch3" style="max-height:220px"></canvas></div>
+<div class="panel"><h2>VO2max</h2><canvas id="ch4"></canvas></div>
 {% endif %}
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
@@ -184,5 +185,10 @@ if (M === 'carga') {
         datasets: [
             { label:'Moderados', data: D.intensity.map(r => +r.moderate), backgroundColor: C.s1 },
             { label:'Vigorosos ×2', data: D.intensity.map(r => +r.vigorous2), backgroundColor: C.s2 }]}});
+    const vd = Object.fromEntries(D.vo2max.map(r => [r.day, r]));
+    const vv = k => D.daily.map(r => vd[r.day] ? vd[r.day][k] : null);
+    new Chart(ch4, { type:'line', data: { labels: days, datasets: [
+        { label:'Carrera', data: vv('vo2max_running'), borderColor: C.s1, pointRadius:2, spanGaps:true },
+        { label:'Ciclismo', data: vv('vo2max_cycling'), borderColor: C.s3, pointRadius:2, spanGaps:true }]}});
 }
 </script>

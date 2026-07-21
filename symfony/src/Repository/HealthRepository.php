@@ -80,6 +80,18 @@ final class HealthRepository
         );
     }
 
+    /** VO2max estimado por Garmin (carrera y ciclismo). Se actualiza esporádicamente, no a diario. */
+    public function vo2max(\DateTimeInterface $from, \DateTimeInterface $to): array
+    {
+        return $this->db->fetchAllAssociative(
+            'SELECT day, vo2max_running, vo2max_cycling
+             FROM garmin_vo2max
+             WHERE day BETWEEN :f AND :t
+             ORDER BY day',
+            ['f' => $from->format('Y-m-d'), 't' => $to->format('Y-m-d')],
+        );
+    }
+
     /** Actividades del rango, más recientes primero. */
     public function activities(\DateTimeInterface $from, \DateTimeInterface $to): array
     {

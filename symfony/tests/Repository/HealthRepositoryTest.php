@@ -32,6 +32,7 @@ final class HealthRepositoryTest extends KernelTestCase
     protected function tearDown(): void
     {
         $this->db->executeStatement("DELETE FROM hc_movement_bucket WHERE origin LIKE 'repo-test-%'");
+        $this->db->executeStatement("DELETE FROM garmin_vo2max WHERE day BETWEEN '2031-06-01' AND '2031-06-02'");
         parent::tearDown();
     }
 
@@ -110,5 +111,22 @@ final class HealthRepositoryTest extends KernelTestCase
         self::assertSame(0, (int) $byDevice['repo-test-beta']['buckets_7d']);
         self::assertNotNull($byDevice['repo-test-alpha']['last_received']);
         self::assertNotNull($byDevice['repo-test-beta']['last_received']);
+    }
+
+    public function testVo2maxReturnsRunningAndCyclingByDay(): void
+    {
+        $day1 = '2031-06-01';
+        $day2 = '2031-06-02';
+        $this->db->insert('garmin_vo2max', ['day' => $day1, 'vo2max_running' => 48.5, 'vo2max_cycling' => 44.0]);
+        $this->db->insert('garmin_vo2max', ['day' => $day2, 'vo2max_running' => 49.0, 'vo2max_cycling' => null]);
+
+        $rows = $this->repo->vo2max(new \DateTimeImmutable($day1), new \DateTimeImmutable($day2));
+
+        self::assertCount(2, $rows);
+        self::assertSame($day1, $rows[0]['day']);
+        self::assertEqualsWithDelta(48.5, (float) $rows[0]['vo2max_running'], 0.001);
+        self::assertEqualsWithDelta(44.0, (float) $rows[0]['vo2max_cycling'], 0.001);
+        self::assertSame($day2, $rows[1]['day']);
+        self::assertNull($rows[1]['vo2max_cycling']);
     }
 }
