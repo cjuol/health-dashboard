@@ -50,11 +50,27 @@ final class MovementApiController
     #[Route('/api/v1/health/movement', name: 'api_movement', methods: ['POST'])]
     public function __invoke(Request $request): JsonResponse
     {
-        // El límite se comprueba por IP ANTES de tocar el body y ANTES de
-        // validar el token: si no, un atacante podría usar tokens erróneos
-        // como oráculo gratuito (401 no consume cupo) para probar credenciales
-        // a fuerza bruta sin nunca gastar su límite de peticiones.
-        $limit = $this->movementLimiter->create($request->getClientIp() ?? 'unknown')->consume(1);
+        // La comprobación del token (barata: solo compara cabeceras, no
+        // toca el body ni la BD) va ANTES del rate limit para poder separar
+        // la población que consume cada cupo. Detrás de un proxy inverso o
+        // túnel (Cloudflare Tunnel, ver README) no hay `trusted_proxies`
+        // configurado, así que getClientIp() siempre devuelve la IP del
+        // proxy: si midiéramos "por IP" a secas, TODO el tráfico —incluida
+        // la app real— compartiría un único cupo global, y a un atacante le
+        // bastaría mandar tokens erróneos para agotarlo y dejar a la app
+        // real bloqueada con 429. Separando la clave según el resultado del
+        // token, el cupo generoso de la app real ('app', 60/min) queda
+        // protegido de esa saturación; el cupo de quien no tiene token
+        // válido ('anon:<ip>') sigue colapsando en un único bucket
+        // compartido detrás del proxy, pero eso solo perjudica a quien
+        // intenta fuerza bruta, nunca a la app.
+        $auth = $request->headers->get('Authorization', '');
+        $tokenValid = '' !== $this->apiToken
+            && str_starts_with($auth, 'Bearer ')
+            && hash_equals($this->apiToken, substr($auth, 7));
+
+        $limiterKey = $tokenValid ? 'app' : 'anon:'.($request->getClientIp() ?? 'unknown');
+        $limit = $this->movementLimiter->create($limiterKey)->consume(1);
         if (!$limit->isAccepted()) {
             $retryAfterSeconds = max(0, $limit->getRetryAfter()->getTimestamp() - time());
 
@@ -65,12 +81,11 @@ final class MovementApiController
             );
         }
 
-        // Auth por Bearer con comparación en tiempo constante.
-        $auth = $request->headers->get('Authorization', '');
-        if ('' === $this->apiToken
-            || !str_starts_with($auth, 'Bearer ')
-            || !hash_equals($this->apiToken, substr($auth, 7))
-        ) {
+        // El 401 se devuelve DESPUÉS de que el límite haya aceptado la
+        // petición: así el token inválido sigue consumiendo cupo (del
+        // bucket 'anon') y no se convierte en un oráculo gratuito para
+        // probar credenciales a fuerza bruta sin gastar límite.
+        if (!$tokenValid) {
             return new JsonResponse(['error' => 'unauthorized'], 401);
         }
 
@@ -79,6 +94,16 @@ final class MovementApiController
         $mimeType = strtolower(trim(explode(';', $request->headers->get('Content-Type', ''))[0]));
         if ('application/json' !== $mimeType) {
             return new JsonResponse(['error' => 'se requiere Content-Type: application/json'], 415);
+        }
+
+        // Comprobación temprana por cabecera, ANTES de bufferizar el body
+        // entero con getContent(): así un cliente que anuncia un
+        // Content-Length superior al límite se rechaza sin gastar memoria
+        // leyéndolo. El strlen() de después queda como red de seguridad
+        // (Content-Length ausente o falseado a la baja).
+        $contentLength = $request->headers->get('Content-Length');
+        if (null !== $contentLength && (int) $contentLength > self::MAX_BODY_BYTES) {
+            return new JsonResponse(['error' => 'cuerpo demasiado grande (máximo 2 MB)'], 413);
         }
 
         $body = $request->getContent();

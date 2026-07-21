@@ -112,6 +112,13 @@ final class MovementApiControllerTest extends WebTestCase
                     'origin' => 'phone',
                     'steps' => -5,
                 ],
+                [ // steps fuera del rango de la columna INTEGER: no debe
+                  // provocar un 500 ni tirar abajo el resto del lote.
+                    'bucket_start' => '2024-01-01T14:00:00+00:00',
+                    'bucket_end' => '2024-01-01T14:15:00+00:00',
+                    'origin' => 'phone',
+                    'steps' => 9_999_999_999,
+                ],
             ],
         ];
 
@@ -120,7 +127,7 @@ final class MovementApiControllerTest extends WebTestCase
         self::assertSame(Response::HTTP_OK, $client->getResponse()->getStatusCode());
         $data = json_decode($client->getResponse()->getContent(), true);
         self::assertSame(1, $data['upserted']);
-        self::assertCount(3, $data['rejected']);
+        self::assertCount(4, $data['rejected']);
         foreach ($data['rejected'] as $entry) {
             self::assertArrayHasKey('bucket_start', $entry);
             self::assertArrayHasKey('reason', $entry);
@@ -177,22 +184,63 @@ final class MovementApiControllerTest extends WebTestCase
         self::assertSame(Response::HTTP_REQUEST_ENTITY_TOO_LARGE, $client->getResponse()->getStatusCode());
     }
 
+    public function testPayloadTooLargeWithFakeContentLengthHeaderIsRejectedBeforeReadingBody(): void
+    {
+        $client = $this->client;
+
+        // Content-Length mentiroso: el body real es minúsculo, pero la
+        // cabecera declara más de 2 MB. El controlador debe rechazarlo
+        // consultando la cabecera ANTES de llamar a getContent() (ver
+        // MovementApiController), así que ni hace falta mandar 2 MB de
+        // body real para comprobarlo.
+        $this->post($client, '{"buckets":[]}', [
+            'CONTENT_LENGTH' => (string) (3 * 1024 * 1024),
+            'REMOTE_ADDR' => '203.0.113.22',
+        ]);
+
+        self::assertSame(Response::HTTP_REQUEST_ENTITY_TOO_LARGE, $client->getResponse()->getStatusCode());
+    }
+
     public function testTooManyRequestsReturns429WithRetryAfterHeader(): void
     {
         $client = $this->client;
-        $server = ['REMOTE_ADDR' => '203.0.113.18'];
+        // Token inválido a propósito: así ejercitamos la población 'anon'
+        // (una IP sin token válido intentando fuerza bruta), que es la que
+        // de verdad puede saturarse detrás de un proxy inverso. Cada 401
+        // sigue consumiendo cupo (no es un oráculo gratuito), así que tras
+        // agotar el límite de test (config/packages/rate_limiter.yaml,
+        // when@test: 15/min) la siguiente petición debe rebotar con 429.
+        $server = ['HTTP_AUTHORIZATION' => 'Bearer token-incorrecto', 'REMOTE_ADDR' => '203.0.113.18'];
 
-        // El límite en test (config/packages/rate_limiter.yaml, when@test) es
-        // de 2 peticiones por minuto: la tercera debe rebotar con 429.
-        $this->post($client, ['buckets' => []], $server);
-        self::assertSame(Response::HTTP_OK, $client->getResponse()->getStatusCode());
-
-        $this->post($client, ['buckets' => []], $server);
-        self::assertSame(Response::HTTP_OK, $client->getResponse()->getStatusCode());
+        for ($i = 0; $i < 15; ++$i) {
+            $this->post($client, ['buckets' => []], $server);
+            self::assertSame(Response::HTTP_UNAUTHORIZED, $client->getResponse()->getStatusCode());
+        }
 
         $this->post($client, ['buckets' => []], $server);
         self::assertSame(Response::HTTP_TOO_MANY_REQUESTS, $client->getResponse()->getStatusCode());
         self::assertTrue($client->getResponse()->headers->has('Retry-After'));
         self::assertGreaterThanOrEqual(0, (int) $client->getResponse()->headers->get('Retry-After'));
+    }
+
+    public function testAnonFloodingDoesNotConsumeValidTokenBucket(): void
+    {
+        $client = $this->client;
+
+        // Saturamos por completo el cupo 'anon' de esta IP (misma factory
+        // y mismo límite que el de la app, 15/min en test). Antes de este
+        // fix la clave era compartida por IP a secas: esto habría agotado
+        // también el cupo de la app real. Con la clave separada, no debe
+        // afectarle.
+        $anonServer = ['HTTP_AUTHORIZATION' => 'Bearer token-incorrecto', 'REMOTE_ADDR' => '203.0.113.19'];
+        for ($i = 0; $i < 16; ++$i) {
+            $this->post($client, ['buckets' => []], $anonServer);
+        }
+        self::assertSame(Response::HTTP_TOO_MANY_REQUESTS, $client->getResponse()->getStatusCode());
+
+        // Petición legítima (token válido, clave 'app'): debe seguir
+        // aceptándose con normalidad pese al flood anónimo anterior.
+        $this->post($client, ['buckets' => []], ['REMOTE_ADDR' => '203.0.113.20']);
+        self::assertSame(Response::HTTP_OK, $client->getResponse()->getStatusCode());
     }
 }

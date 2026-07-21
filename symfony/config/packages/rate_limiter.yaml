@@ -1,8 +1,18 @@
-# Limita la ingesta de movimiento (POST /api/v1/health/movement) por IP.
+# Limita la ingesta de movimiento (POST /api/v1/health/movement).
 # token_bucket: permite ráfagas cortas (la app manda un día completo de una
 # vez) sin dejar la puerta abierta a que alguien machaque el endpoint.
 # lock_factory: null porque symfony/lock no está instalado — solo corre una
 # instancia del contenedor web, así que no hace falta lock distribuido.
+#
+# MovementApiController usa esta MISMA factory con dos claves distintas
+# según el resultado de comprobar el token, no por IP a secas: detrás de un
+# proxy inverso/túnel (sin trusted_proxies configurado) getClientIp()
+# devuelve siempre la IP del proxy, así que medir "por IP" colapsaría TODO
+# el tráfico —app real incluida— en un único cupo compartido. Clave 'app'
+# para token válido (protege contra un bucle de reintento de la app real
+# desbocado), clave 'anon:<ip>' para el resto (throttle de fuerza bruta; se
+# degrada a un único bucket compartido detrás del proxy, pero eso solo
+# perjudica a quien no tiene el token).
 framework:
     rate_limiter:
         movement_api:
@@ -11,13 +21,15 @@ framework:
             rate: { interval: '1 minute', amount: 60 }
             lock_factory: null
 
-# En test usamos un cupo minúsculo para poder provocar el 429 de forma
-# determinista sin tener que disparar 60 peticiones en cada test.
+# En test usamos un cupo pequeño para poder provocar el 429 sin tener que
+# disparar 60 peticiones en cada test, pero lo bastante alto para no agotar
+# el cupo compartido de la clave 'app' entre los distintos tests
+# funcionales que usan token válido (MovementApiControllerTest).
 when@test:
     framework:
         rate_limiter:
             movement_api:
                 policy: token_bucket
-                limit: 2
-                rate: { interval: '1 minute', amount: 2 }
+                limit: 15
+                rate: { interval: '1 minute', amount: 15 }
                 lock_factory: null
