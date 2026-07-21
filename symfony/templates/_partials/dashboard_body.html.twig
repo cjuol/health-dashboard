@@ -190,7 +190,17 @@ const align = (rows, key) => { const m = byDay(rows, key); return S.steps.map(r 
 
 // 1) Pasos apilados por fuente + objetivo (una sola gráfica: cuánto y quién lo midió)
 // Identidad de serie: Garmin = slot 1, Móvil = slot 3, Objetivo = línea de referencia neutra.
-new Chart(chSteps, { options: { scales: { x: { stacked: true }, y: { stacked: true } } }, data: {
+// La distancia recorrida con el móvil (phone_distance_m) no tiene serie propia
+// aquí (unidad distinta a pasos): se muestra como línea extra del tooltip de
+// "Móvil", igual que en la tabla de /detalle/pasos.
+const phoneDistance = align(S.steps_source, 'phone_distance_m');
+new Chart(chSteps, { options: { scales: { x: { stacked: true }, y: { stacked: true } },
+    plugins: { tooltip: { callbacks: { afterLabel: (ctx) => {
+        if (ctx.dataset.label !== 'Móvil') { return undefined; }
+        const d = phoneDistance[ctx.dataIndex];
+        if (!d) { return undefined; }
+        return 'Distancia móvil: ' + (d >= 1000 ? (d / 1000).toFixed(1) + ' km' : Math.round(d) + ' m');
+    } } } } }, data: {
     labels: days,
     datasets: [
         { type: 'bar', label: 'Garmin', data: align(S.steps_source, 'garmin_steps').map(v => +v || 0), backgroundColor: C.s1 },
