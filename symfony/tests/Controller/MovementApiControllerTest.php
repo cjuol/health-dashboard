@@ -35,12 +35,15 @@ final class MovementApiControllerTest extends WebTestCase
     {
         $content = \is_array($body) ? json_encode($body, \JSON_THROW_ON_ERROR) : $body;
 
+        // El rate limiter cuenta por IP (REMOTE_ADDR): cada test usa la suya
+        // propia (ver testXxx) para no compartir cupo entre tests distintos.
         $client->request(
             'POST',
             self::ENDPOINT,
             server: array_merge([
                 'HTTP_AUTHORIZATION' => 'Bearer '.self::TOKEN,
                 'CONTENT_TYPE' => 'application/json',
+                'REMOTE_ADDR' => '203.0.113.10',
             ], $server),
             content: $content,
         );
@@ -66,7 +69,9 @@ final class MovementApiControllerTest extends WebTestCase
             ]],
         ];
 
-        $this->post($client, $payload);
+        $server = ['REMOTE_ADDR' => '203.0.113.11'];
+
+        $this->post($client, $payload, $server);
         self::assertSame(Response::HTTP_OK, $client->getResponse()->getStatusCode());
         $data = json_decode($client->getResponse()->getContent(), true);
         self::assertSame(1, $data['upserted']);
@@ -74,7 +79,7 @@ final class MovementApiControllerTest extends WebTestCase
         self::assertSame(1, $this->countBuckets());
 
         // Reenvío idéntico: mismo resultado, sin duplicar filas.
-        $this->post($client, $payload);
+        $this->post($client, $payload, $server);
         $data = json_decode($client->getResponse()->getContent(), true);
         self::assertSame(1, $data['upserted']);
         self::assertSame(1, $this->countBuckets());
@@ -110,7 +115,7 @@ final class MovementApiControllerTest extends WebTestCase
             ],
         ];
 
-        $this->post($client, $payload);
+        $this->post($client, $payload, ['REMOTE_ADDR' => '203.0.113.12']);
 
         self::assertSame(Response::HTTP_OK, $client->getResponse()->getStatusCode());
         $data = json_decode($client->getResponse()->getContent(), true);
@@ -127,7 +132,7 @@ final class MovementApiControllerTest extends WebTestCase
     public function testUnauthorizedWithWrongToken(): void
     {
         $client = $this->client;
-        $this->post($client, ['buckets' => []], ['HTTP_AUTHORIZATION' => 'Bearer token-incorrecto']);
+        $this->post($client, ['buckets' => []], ['HTTP_AUTHORIZATION' => 'Bearer token-incorrecto', 'REMOTE_ADDR' => '203.0.113.13']);
 
         self::assertSame(Response::HTTP_UNAUTHORIZED, $client->getResponse()->getStatusCode());
         $data = json_decode($client->getResponse()->getContent(), true);
@@ -137,7 +142,7 @@ final class MovementApiControllerTest extends WebTestCase
     public function testUnprocessableWhenBucketsIsMissing(): void
     {
         $client = $this->client;
-        $this->post($client, ['device' => 'pixel-test']);
+        $this->post($client, ['device' => 'pixel-test'], ['REMOTE_ADDR' => '203.0.113.14']);
 
         self::assertSame(Response::HTTP_UNPROCESSABLE_ENTITY, $client->getResponse()->getStatusCode());
     }
@@ -145,7 +150,7 @@ final class MovementApiControllerTest extends WebTestCase
     public function testUnsupportedMediaTypeWithWrongContentType(): void
     {
         $client = $this->client;
-        $this->post($client, json_encode(['buckets' => []]), ['CONTENT_TYPE' => 'text/plain']);
+        $this->post($client, json_encode(['buckets' => []]), ['CONTENT_TYPE' => 'text/plain', 'REMOTE_ADDR' => '203.0.113.15']);
 
         self::assertSame(Response::HTTP_UNSUPPORTED_MEDIA_TYPE, $client->getResponse()->getStatusCode());
     }
@@ -153,7 +158,7 @@ final class MovementApiControllerTest extends WebTestCase
     public function testContentTypeWithCharsetParameterIsAccepted(): void
     {
         $client = $this->client;
-        $this->post($client, ['buckets' => []], ['CONTENT_TYPE' => 'application/json; charset=utf-8']);
+        $this->post($client, ['buckets' => []], ['CONTENT_TYPE' => 'application/json; charset=utf-8', 'REMOTE_ADDR' => '203.0.113.16']);
 
         self::assertSame(Response::HTTP_OK, $client->getResponse()->getStatusCode());
     }
@@ -167,8 +172,27 @@ final class MovementApiControllerTest extends WebTestCase
             'origin' => 'phone',
         ]);
 
-        $this->post($client, ['buckets' => $buckets]);
+        $this->post($client, ['buckets' => $buckets], ['REMOTE_ADDR' => '203.0.113.17']);
 
         self::assertSame(Response::HTTP_REQUEST_ENTITY_TOO_LARGE, $client->getResponse()->getStatusCode());
+    }
+
+    public function testTooManyRequestsReturns429WithRetryAfterHeader(): void
+    {
+        $client = $this->client;
+        $server = ['REMOTE_ADDR' => '203.0.113.18'];
+
+        // El límite en test (config/packages/rate_limiter.yaml, when@test) es
+        // de 2 peticiones por minuto: la tercera debe rebotar con 429.
+        $this->post($client, ['buckets' => []], $server);
+        self::assertSame(Response::HTTP_OK, $client->getResponse()->getStatusCode());
+
+        $this->post($client, ['buckets' => []], $server);
+        self::assertSame(Response::HTTP_OK, $client->getResponse()->getStatusCode());
+
+        $this->post($client, ['buckets' => []], $server);
+        self::assertSame(Response::HTTP_TOO_MANY_REQUESTS, $client->getResponse()->getStatusCode());
+        self::assertTrue($client->getResponse()->headers->has('Retry-After'));
+        self::assertGreaterThanOrEqual(0, (int) $client->getResponse()->headers->get('Retry-After'));
     }
 }

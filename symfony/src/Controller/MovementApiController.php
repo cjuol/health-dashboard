@@ -7,6 +7,7 @@ use Doctrine\DBAL\Connection;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\RateLimiter\RateLimiterFactory;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
@@ -35,6 +36,8 @@ final class MovementApiController
         private readonly Connection $db,
         private readonly HttpClientInterface $http,
         private readonly MovementBucketValidator $validator,
+        #[Autowire(service: 'limiter.movement_api')]
+        private readonly RateLimiterFactory $movementLimiter,
         #[Autowire(env: 'MOVEMENT_API_TOKEN')]
         private readonly string $apiToken,
         #[Autowire(env: 'SIDECAR_URL')]
@@ -47,6 +50,21 @@ final class MovementApiController
     #[Route('/api/v1/health/movement', name: 'api_movement', methods: ['POST'])]
     public function __invoke(Request $request): JsonResponse
     {
+        // El límite se comprueba por IP ANTES de tocar el body y ANTES de
+        // validar el token: si no, un atacante podría usar tokens erróneos
+        // como oráculo gratuito (401 no consume cupo) para probar credenciales
+        // a fuerza bruta sin nunca gastar su límite de peticiones.
+        $limit = $this->movementLimiter->create($request->getClientIp() ?? 'unknown')->consume(1);
+        if (!$limit->isAccepted()) {
+            $retryAfterSeconds = max(0, $limit->getRetryAfter()->getTimestamp() - time());
+
+            return new JsonResponse(
+                ['error' => 'demasiadas peticiones, reintenta más tarde'],
+                429,
+                ['Retry-After' => (string) $retryAfterSeconds],
+            );
+        }
+
         // Auth por Bearer con comparación en tiempo constante.
         $auth = $request->headers->get('Authorization', '');
         if ('' === $this->apiToken

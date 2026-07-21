@@ -1,0 +1,23 @@
+# Limita la ingesta de movimiento (POST /api/v1/health/movement) por IP.
+# token_bucket: permite ráfagas cortas (la app manda un día completo de una
+# vez) sin dejar la puerta abierta a que alguien machaque el endpoint.
+# lock_factory: null porque symfony/lock no está instalado — solo corre una
+# instancia del contenedor web, así que no hace falta lock distribuido.
+framework:
+    rate_limiter:
+        movement_api:
+            policy: token_bucket
+            limit: 60
+            rate: { interval: '1 minute', amount: 60 }
+            lock_factory: null
+
+# En test usamos un cupo minúsculo para poder provocar el 429 de forma
+# determinista sin tener que disparar 60 peticiones en cada test.
+when@test:
+    framework:
+        rate_limiter:
+            movement_api:
+                policy: token_bucket
+                limit: 2
+                rate: { interval: '1 minute', amount: 2 }
+                lock_factory: null
