@@ -227,6 +227,7 @@ final class ShareController extends AbstractController
             'pasos' => [
                 'by_source' => $this->repo->dailyStepsBySource($from, $to),
                 'daily' => $this->repo->dailySteps($from, $to),
+                'floors' => $this->repo->dailyFloors($from, $to),
                 'heatmap' => $this->heatmap($from, $to),
             ],
             'sueno' => ['sleep' => $this->repo->sleep($from, $to)],
@@ -239,7 +240,7 @@ final class ShareController extends AbstractController
             ],
         };
         if ('pasos' === $metric) {
-            $data['step_days'] = $this->stepDayRows($data['daily'], $data['by_source']);
+            $data['step_days'] = $this->stepDayRows($data['daily'], $data['by_source'], $data['floors']);
         }
 
         return $this->render('share/detail.html.twig', [
@@ -338,12 +339,16 @@ final class ShareController extends AbstractController
         return ['rows' => $rows, 'max' => $max];
     }
 
-    /** Combina dailySteps() + dailyStepsBySource() en filas por día (mismo criterio que DetailController). */
-    private function stepDayRows(array $daily, array $bySource): array
+    /** Combina dailySteps() + dailyStepsBySource() + dailyFloors() en filas por día (mismo criterio que DetailController). */
+    private function stepDayRows(array $daily, array $bySource, array $floors): array
     {
         $sourceByDay = [];
         foreach ($bySource as $r) {
             $sourceByDay[$r['day']] = $r;
+        }
+        $floorsByDay = [];
+        foreach ($floors as $r) {
+            $floorsByDay[$r['day']] = $r['floors'];
         }
 
         $rows = [];
@@ -357,6 +362,7 @@ final class ShareController extends AbstractController
                 'daily_goal' => (int) $r['daily_goal'],
                 'pct_goal' => (float) $r['pct_goal'],
                 'goal_met' => (bool) $r['goal_met'],
+                'floors' => null !== ($floorsByDay[$r['day']] ?? null) ? (int) $floorsByDay[$r['day']] : null,
             ];
         }
         usort($rows, static fn (array $a, array $b) => $b['day'] <=> $a['day']);

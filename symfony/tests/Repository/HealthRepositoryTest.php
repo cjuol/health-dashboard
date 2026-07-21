@@ -34,6 +34,7 @@ final class HealthRepositoryTest extends KernelTestCase
         $this->db->executeStatement("DELETE FROM hc_movement_bucket WHERE origin LIKE 'repo-test-%'");
         $this->db->executeStatement("DELETE FROM garmin_vo2max WHERE day BETWEEN '2031-06-01' AND '2031-06-02'");
         $this->db->executeStatement("DELETE FROM garmin_body_composition WHERE day = '2031-06-03'");
+        $this->db->executeStatement("DELETE FROM garmin_daily WHERE day = '2031-06-04'");
         parent::tearDown();
     }
 
@@ -148,5 +149,17 @@ final class HealthRepositoryTest extends KernelTestCase
         self::assertCount(1, $rows);
         self::assertEqualsWithDelta(58.6, (float) $rows[0]['body_water_pct'], 0.001);
         self::assertEqualsWithDelta(3.1, (float) $rows[0]['bone_mass_kg'], 0.001);
+    }
+
+    public function testDailyFloorsReturnsFloorsByDay(): void
+    {
+        $day = '2031-06-04';
+        $this->db->insert('garmin_daily', ['day' => $day, 'floors' => 12]);
+
+        $rows = $this->repo->dailyFloors(new \DateTimeImmutable($day), new \DateTimeImmutable($day));
+
+        self::assertCount(1, $rows);
+        self::assertSame($day, $rows[0]['day']);
+        self::assertSame(12, (int) $rows[0]['floors']);
     }
 }

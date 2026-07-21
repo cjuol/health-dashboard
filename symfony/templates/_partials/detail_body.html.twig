@@ -7,9 +7,9 @@
    Variables esperadas: metric, metrics, from, to, data, routes.detail, route_params
    Para metric == 'pasos', data también trae step_days: filas por día
    (day, phone_steps, garmin_steps, phone_distance_m, daily_goal, pct_goal,
-   goal_met) ya fusionadas en el controlador a partir de
-   dailySteps()+dailyStepsBySource(), más recientes primero — usadas por la
-   lista junto al heatmap.
+   goal_met, floors) ya fusionadas en el controlador a partir de
+   dailySteps()+dailyStepsBySource()+dailyFloors(), más recientes primero —
+   usadas por la lista junto al heatmap.
 #}
 <form class="inline panel" method="get">
     <nav style="display:flex; gap:.4rem; margin-right:auto">
@@ -69,7 +69,7 @@
         <h2>Pasos por día</h2>
         <div style="overflow-y:auto; max-height:{{ heatmapContentHeight }}px">
         <table>
-            <tr><th>Día</th><th>Pasos teléfono</th><th>Distancia móvil</th><th>Pasos Garmin</th><th>Objetivo</th><th>% objetivo</th></tr>
+            <tr><th>Día</th><th>Pasos teléfono</th><th>Distancia móvil</th><th>Pasos Garmin</th><th>Objetivo</th><th>% objetivo</th><th>Pisos</th></tr>
             {% for row in data.step_days %}
             <tr>
                 <td>{{ row.day|date('d/m/Y') }}</td>
@@ -86,9 +86,10 @@
                 <td>{{ row.garmin_steps|number_format(0, ',', '.') }}</td>
                 <td>{{ row.daily_goal|number_format(0, ',', '.') }}</td>
                 <td>{{ row.pct_goal|round(0, 'common') }} %{{ row.goal_met ? ' ✓' }}</td>
+                <td>{{ row.floors ?? '—' }}</td>
             </tr>
             {% else %}
-            <tr><td colspan="6" class="muted">Sin datos en este rango.</td></tr>
+            <tr><td colspan="7" class="muted">Sin datos en este rango.</td></tr>
             {% endfor %}
         </table>
         </div>
@@ -110,7 +111,10 @@
     <div class="panel"><h2>HRV</h2><canvas id="ch2"></canvas></div>
 </div>
 <div class="panel"><h2>Minutos de intensidad / semana</h2><canvas id="ch3" style="max-height:220px"></canvas></div>
-<div class="panel"><h2>VO2max</h2><canvas id="ch4"></canvas></div>
+<div class="grid2">
+    <div class="panel"><h2>VO2max</h2><canvas id="ch4"></canvas></div>
+    <div class="panel"><h2>Metabolismo basal (BMR)</h2><canvas id="ch5"></canvas></div>
+</div>
 {% endif %}
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
@@ -192,5 +196,7 @@ if (M === 'carga') {
     new Chart(ch4, { type:'line', data: { labels: days, datasets: [
         { label:'Carrera', data: vv('vo2max_running'), borderColor: C.s1, pointRadius:2, spanGaps:true },
         { label:'Ciclismo', data: vv('vo2max_cycling'), borderColor: C.s3, pointRadius:2, spanGaps:true }]}});
+    new Chart(ch5, { type:'line', options:{ plugins:{ legend:{ display:false } } }, data: { labels: days, datasets: [
+        { label:'BMR (kcal)', data: D.daily.map(r => r.bmr_kcal ? +r.bmr_kcal : null), borderColor: C.s2, pointRadius:2, spanGaps:true }]}});
 }
 </script>

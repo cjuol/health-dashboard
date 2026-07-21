@@ -10,10 +10,10 @@ use Symfony\Component\Routing\Attribute\Route;
 
 /**
  * Vistas de detalle: una métrica, rango libre, granularidad fina.
- *   /detalle/pasos   — apilado por fuente + heatmap día×hora (turnos visibles)
+ *   /detalle/pasos   — apilado por fuente + heatmap día×hora (turnos visibles) + pisos
  *   /detalle/sueno   — fases, score, respiración, SpO2
  *   /detalle/cuerpo  — peso, % grasa, masa muscular, % agua, masa ósea
- *   /detalle/carga   — FC reposo, estrés, HRV, minutos de intensidad, VO2max
+ *   /detalle/carga   — FC reposo, estrés, HRV, minutos de intensidad, VO2max, BMR
  *   /actividades     — listado enriquecido (TE, carga, ritmo, SWOLF) con filtros
  *   /actividad/{id}  — sesión: zonas FC, parciales/laps, series de fuerza
  */
@@ -34,6 +34,7 @@ final class DetailController extends AbstractController
             'pasos' => [
                 'by_source' => $this->repo->dailyStepsBySource($from, $to),
                 'daily' => $this->repo->dailySteps($from, $to),
+                'floors' => $this->repo->dailyFloors($from, $to),
                 'heatmap' => $this->heatmap($from, $to),
             ],
             'sueno' => ['sleep' => $this->repo->sleep($from, $to)],
@@ -46,7 +47,7 @@ final class DetailController extends AbstractController
             ],
         };
         if ('pasos' === $metric) {
-            $data['step_days'] = $this->stepDayRows($data['daily'], $data['by_source']);
+            $data['step_days'] = $this->stepDayRows($data['daily'], $data['by_source'], $data['floors']);
         }
 
         return $this->render('detail/index.html.twig', [
@@ -112,14 +113,18 @@ final class DetailController extends AbstractController
 
     /**
      * Combina dailySteps() (meta/% cumplido) con dailyStepsBySource() (reparto
-     * Garmin/móvil) en una fila por día, para la lista de días que acompaña
-     * al heatmap. Día más reciente primero.
+     * Garmin/móvil) y dailyFloors() (pisos subidos) en una fila por día, para
+     * la lista de días que acompaña al heatmap. Día más reciente primero.
      */
-    private function stepDayRows(array $daily, array $bySource): array
+    private function stepDayRows(array $daily, array $bySource, array $floors): array
     {
         $sourceByDay = [];
         foreach ($bySource as $r) {
             $sourceByDay[$r['day']] = $r;
+        }
+        $floorsByDay = [];
+        foreach ($floors as $r) {
+            $floorsByDay[$r['day']] = $r['floors'];
         }
 
         $rows = [];
@@ -133,6 +138,7 @@ final class DetailController extends AbstractController
                 'daily_goal' => (int) $r['daily_goal'],
                 'pct_goal' => (float) $r['pct_goal'],
                 'goal_met' => (bool) $r['goal_met'],
+                'floors' => null !== ($floorsByDay[$r['day']] ?? null) ? (int) $floorsByDay[$r['day']] : null,
             ];
         }
         usort($rows, static fn (array $a, array $b) => $b['day'] <=> $a['day']);

@@ -181,6 +181,18 @@ final class HealthRepository
         );
     }
 
+    /** Pisos subidos por día (Garmin), para acompañar el detalle de pasos. */
+    public function dailyFloors(\DateTimeInterface $from, \DateTimeInterface $to): array
+    {
+        return $this->db->fetchAllAssociative(
+            'SELECT day, floors
+             FROM garmin_daily
+             WHERE day BETWEEN :f AND :t
+             ORDER BY day',
+            ['f' => $from->format('Y-m-d'), 't' => $to->format('Y-m-d')],
+        );
+    }
+
     /** Estado de recuperación de hoy: última HRV y último sueño registrados. */
     public function recoveryToday(): array
     {
