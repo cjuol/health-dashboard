@@ -17,7 +17,7 @@
         <a href="{{ path(routes.detail, route_params|merge({metric: m, desde: from|date('Y-m-d'), hasta: to|date('Y-m-d')})) }}"
            style="padding:.35rem .7rem; border-radius:6px; text-decoration:none;
                   {{ m == metric ? 'background:var(--accent); color:var(--bg); font-weight:600' : 'color:var(--muted)' }}">
-            {{ {pasos: 'Pasos', sueno: 'Sueño', cuerpo: 'Cuerpo', carga: 'Carga'}[m] }}</a>
+            {{ {pasos: 'Pasos', sueno: 'Sueño', cuerpo: 'Cuerpo', carga: 'Carga', correlaciones: 'Correlaciones'}[m] }}</a>
         {% endfor %}
     </nav>
     <label>Desde <input type="date" name="desde" value="{{ from|date('Y-m-d') }}"></label>
@@ -115,6 +115,15 @@
     <div class="panel"><h2>VO2max</h2><canvas id="ch4"></canvas></div>
     <div class="panel"><h2>Metabolismo basal (BMR)</h2><canvas id="ch5"></canvas></div>
 </div>
+{% elseif metric == 'correlaciones' %}
+<div class="grid2">
+    <div class="panel"><h2>Pasos → Sueño <span class="muted" id="r1" style="font-weight:400"></span></h2><canvas id="ch1"></canvas></div>
+    <div class="panel"><h2>HRV vs Sueño <span class="muted" id="r2" style="font-weight:400"></span></h2><canvas id="ch2"></canvas></div>
+</div>
+<div class="grid2">
+    <div class="panel"><h2>Estrés vs Pasos <span class="muted" id="r3" style="font-weight:400"></span></h2><canvas id="ch3"></canvas></div>
+    <div class="panel"><h2>FC en reposo vs HRV <span class="muted" id="r4" style="font-weight:400"></span></h2><canvas id="ch4"></canvas></div>
+</div>
 {% endif %}
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
@@ -200,5 +209,77 @@ if (M === 'carga') {
         { label:'Ciclismo', data: vv('vo2max_cycling'), borderColor: C.s3, pointRadius:2, spanGaps:true }]}});
     new Chart(ch5, { type:'line', options:{ plugins:{ legend:{ display:false } } }, data: { labels: days, datasets: [
         { label:'BMR (kcal)', data: D.daily.map(r => r.bmr_kcal ? +r.bmr_kcal : null), borderColor: C.s2, pointRadius:2, spanGaps:true }]}});
+}
+if (M === 'correlaciones') {
+    // garmin_sleep.day queda como el día de despertar: la noche D→D+1 se
+    // guarda con day = D+1 (así lo entrega la API de sueño de Garmin para
+    // la fecha consultada). Por eso los pasos del día D se emparejan con
+    // el sueño del día D+1, no con el sueño del propio día D.
+    const addDays = (day, n) => {
+        const d = new Date(day + 'T00:00:00Z');
+        d.setUTCDate(d.getUTCDate() + n);
+        return d.toISOString().slice(0, 10);
+    };
+    // Coeficiente de correlación de Pearson sobre pares [x, y] ya filtrados de nulos.
+    const pearson = (pairs) => {
+        const n = pairs.length;
+        if (n < 2) return null;
+        const mx = pairs.reduce((a, p) => a + p[0], 0) / n;
+        const my = pairs.reduce((a, p) => a + p[1], 0) / n;
+        let sxy = 0, sxx = 0, syy = 0;
+        for (const [x, y] of pairs) {
+            const dx = x - mx, dy = y - my;
+            sxy += dx * dy; sxx += dx * dx; syy += dy * dy;
+        }
+        const denom = Math.sqrt(sxx * syy);
+        return denom === 0 ? null : sxy / denom;
+    };
+    const scatter = (canvas, label, pairs, xLabel, yLabel, color) => {
+        new Chart(canvas, { type: 'scatter', options: {
+            scales: {
+                x: { title: { display: true, text: xLabel } },
+                y: { title: { display: true, text: yLabel } },
+            },
+            plugins: { legend: { display: false } },
+        }, data: { datasets: [{ label, data: pairs.map(([x, y]) => ({ x, y })), backgroundColor: color }] } });
+    };
+    const setR = (id, pairs) => {
+        const r = pearson(pairs);
+        document.getElementById(id).textContent = (r === null)
+            ? `(n = ${pairs.length}, insuficiente)`
+            : `r = ${r.toFixed(2)}, n = ${pairs.length}`;
+    };
+
+    const sleepByDay = Object.fromEntries(D.sleep.map(r => [r.day, r]));
+    const dailyByDay = Object.fromEntries(D.daily.map(r => [r.day, r]));
+
+    // 1. Pasos (día D) vs score de sueño (noche D→D+1, day = D+1 en garmin_sleep).
+    const pairs1 = D.steps
+        .filter(r => r.steps !== null)
+        .map(r => { const s = sleepByDay[addDays(r.day, 1)]; return (s && s.score !== null) ? [+r.steps, +s.score] : null; })
+        .filter(p => p !== null);
+    scatter(ch1, 'Pasos → Sueño', pairs1, 'Pasos (día D)', 'Score de sueño (noche D→D+1)', C.s1);
+    setR('r1', pairs1);
+
+    // 2. HRV nocturno vs score de sueño, mismo día (misma fila de garmin_sleep).
+    const pairs2 = D.sleep
+        .filter(r => r.hrv_avg_ms !== null && r.score !== null)
+        .map(r => [+r.hrv_avg_ms, +r.score]);
+    scatter(ch2, 'HRV vs Sueño', pairs2, 'HRV nocturno (ms)', 'Score de sueño', C.s2);
+    setR('r2', pairs2);
+
+    // 3. Estrés medio vs pasos, mismo día (join garmin_daily × v_steps_daily por day).
+    const pairs3 = D.steps
+        .filter(r => r.steps !== null && dailyByDay[r.day] && dailyByDay[r.day].avg_stress !== null)
+        .map(r => [+r.steps, +dailyByDay[r.day].avg_stress]);
+    scatter(ch3, 'Estrés vs Pasos', pairs3, 'Pasos', 'Estrés medio', C.s3);
+    setR('r3', pairs3);
+
+    // 4. FC en reposo vs HRV nocturno, mismo día (join garmin_daily × garmin_sleep por day).
+    const pairs4 = D.daily
+        .filter(r => r.resting_hr !== null && sleepByDay[r.day] && sleepByDay[r.day].hrv_avg_ms !== null)
+        .map(r => [+r.resting_hr, +sleepByDay[r.day].hrv_avg_ms]);
+    scatter(ch4, 'FC en reposo vs HRV', pairs4, 'FC en reposo (ppm)', 'HRV nocturno (ms)', C.s4);
+    setR('r4', pairs4);
 }
 </script>

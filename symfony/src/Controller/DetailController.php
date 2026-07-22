@@ -10,22 +10,23 @@ use Symfony\Component\Routing\Attribute\Route;
 
 /**
  * Vistas de detalle: una métrica, rango libre, granularidad fina.
- *   /detalle/pasos   — apilado por fuente + heatmap día×hora (turnos visibles) + pisos
- *   /detalle/sueno   — fases, score, respiración, SpO2
- *   /detalle/cuerpo  — peso, % grasa, masa muscular, % agua, masa ósea
- *   /detalle/carga   — FC reposo, estrés, HRV, minutos de intensidad, VO2max, BMR
- *   /actividades     — listado enriquecido (TE, carga, ritmo, SWOLF) con filtros
- *   /actividad/{id}  — sesión: zonas FC, parciales/laps, series de fuerza
+ *   /detalle/pasos          — apilado por fuente + heatmap día×hora (turnos visibles) + pisos
+ *   /detalle/sueno          — fases, score, respiración, SpO2
+ *   /detalle/cuerpo         — peso, % grasa, masa muscular, % agua, masa ósea
+ *   /detalle/carga          — FC reposo, estrés, HRV, minutos de intensidad, VO2max, BMR
+ *   /detalle/correlaciones  — dispersión pasos/sueño/HRV/estrés + coeficiente de Pearson
+ *   /actividades            — listado enriquecido (TE, carga, ritmo, SWOLF) con filtros
+ *   /actividad/{id}         — sesión: zonas FC, parciales/laps, series de fuerza
  */
 final class DetailController extends AbstractController
 {
-    private const METRICS = ['pasos', 'sueno', 'cuerpo', 'carga'];
+    private const METRICS = ['pasos', 'sueno', 'cuerpo', 'carga', 'correlaciones'];
 
     public function __construct(private readonly HealthRepository $repo)
     {
     }
 
-    #[Route('/detalle/{metric}', name: 'detail', requirements: ['metric' => 'pasos|sueno|cuerpo|carga'], methods: ['GET'])]
+    #[Route('/detalle/{metric}', name: 'detail', requirements: ['metric' => 'pasos|sueno|cuerpo|carga|correlaciones'], methods: ['GET'])]
     public function detail(string $metric, Request $request): Response
     {
         [$from, $to] = $this->range($request, defaultDays: 30);
@@ -44,6 +45,11 @@ final class DetailController extends AbstractController
                 'hrv' => $this->repo->hrv($from, $to),
                 'intensity' => $this->repo->weeklyIntensity($from, $to),
                 'vo2max' => $this->repo->vo2max($from, $to),
+            ],
+            'correlaciones' => [
+                'steps' => $this->repo->dailySteps($from, $to),
+                'sleep' => $this->repo->sleep($from, $to),
+                'daily' => $this->repo->garminDaily($from, $to),
             ],
         };
         if ('pasos' === $metric) {

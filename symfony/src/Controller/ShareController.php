@@ -21,7 +21,7 @@ use Symfony\Component\Routing\Attribute\Route;
  */
 final class ShareController extends AbstractController
 {
-    private const METRICS = ['pasos', 'sueno', 'cuerpo', 'carga'];
+    private const METRICS = ['pasos', 'sueno', 'cuerpo', 'carga', 'correlaciones'];
 
     public function __construct(
         private readonly HealthRepository $repo,
@@ -214,7 +214,7 @@ final class ShareController extends AbstractController
         ]);
     }
 
-    #[Route('/compartir/{token}/detalle/{metric}', name: 'share_detail', requirements: ['token' => '[a-f0-9]{64}', 'metric' => 'pasos|sueno|cuerpo|carga'], methods: ['GET'])]
+    #[Route('/compartir/{token}/detalle/{metric}', name: 'share_detail', requirements: ['token' => '[a-f0-9]{64}', 'metric' => 'pasos|sueno|cuerpo|carga|correlaciones'], methods: ['GET'])]
     public function detail(string $token, string $metric, Request $request): Response
     {
         $share = $this->shareOrRedirect($request, $token);
@@ -237,6 +237,11 @@ final class ShareController extends AbstractController
                 'hrv' => $this->repo->hrv($from, $to),
                 'intensity' => $this->repo->weeklyIntensity($from, $to),
                 'vo2max' => $this->repo->vo2max($from, $to),
+            ],
+            'correlaciones' => [
+                'steps' => $this->repo->dailySteps($from, $to),
+                'sleep' => $this->repo->sleep($from, $to),
+                'daily' => $this->repo->garminDaily($from, $to),
             ],
         };
         if ('pasos' === $metric) {
