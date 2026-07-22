@@ -1,23 +1,25 @@
-{# Hoja de estilos compartida (paleta Kanagawa Dragon) entre base.html.twig
-   (propietario) y base_share.html.twig (vista de invitado de un enlace
-   compartido), para no duplicarla entre ambos layouts. #}
+{# Hoja de estilos compartida (paleta oscura estilo Garmin Connect) entre
+   base.html.twig (propietario) y base_share.html.twig (vista de invitado de
+   un enlace compartido), para no duplicarla entre ambos layouts. #}
 <style>
     :root {
-        --bg: #181616; --bg2: #1f1d1d; --panel: #282727; --border: #393836;
-        --fg: #c5c9c5; --muted: #737c73;
-        /* Acento decorativo (no conlleva significado, solo estética de encabezados). */
-        --accent: #c4b28a;
+        --bg: #0c1117; --bg2: #131a22; --panel: #1a2129; --border: #2a333d;
+        --fg: #dbe4ec; --muted: #8b98a5;
+        /* Azul de marca Garmin: h1, enlaces y estado activo de nav. */
+        --accent: #2fa7e0;
+        /* Azul de acción Garmin para botones. */
+        --action: #0d6eb8;
         /* Series de datos: orden fijo, misma identidad en todas las gráficas. */
         --s1: #3987e5; --s2: #199e70; --s3: #c98500; --s4: #9085e9; --s5: #e66767;
         /* Colores de estado: reservados para bien/aviso/crítico, nunca como color de serie. */
-        --ok: #0ca30c; --warn: #fab219; --crit: #d03b3b;
-        /* Alias de rol para enlaces (reutiliza la serie 1, no es un color de serie aquí). */
-        --link: var(--s1);
+        --ok: #12b76a; --warn: #f7a600; --crit: #ff5c4d;
+        /* Alias de rol para enlaces (reutiliza el acento, no es un color de serie aquí). */
+        --link: var(--accent);
     }
     * { box-sizing: border-box; }
     body {
         margin: 0; background: var(--bg); color: var(--fg);
-        font: 15px/1.5 system-ui, -apple-system, sans-serif;
+        font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     }
     header {
         display: flex; align-items: center; flex-wrap: wrap; gap: .8rem 1.5rem;
@@ -29,7 +31,8 @@
     /* Grupo de sesión agrupado: con flex-wrap, un margin-left:auto suelto
        empuja por línea y separa Perfil de Salir al envolver. */
     nav .nav-session { margin-left: auto; display: flex; gap: .3rem 1rem; }
-    nav a:hover, nav a.active { color: var(--fg); text-decoration: underline; }
+    nav a:hover { color: var(--fg); text-decoration: underline; }
+    nav a.active { color: var(--accent); text-decoration: none; }
     /* Botón de sync incrustado como <form> en el nav: se estiliza como un
        enlace más (mismo tipo, color y padding) en vez de como botón. */
     nav .nav-sync { display: inline-flex; margin: 0; }
@@ -45,13 +48,19 @@
     }
     main { max-width: 1600px; margin: 0 auto; padding: 1.5rem; }
     .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .8rem; margin-bottom: 1.5rem; }
-    .card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: .9rem 1rem; }
-    .card .label { color: var(--muted); font-size: .78rem; text-transform: uppercase; letter-spacing: .05em; }
-    .card .value { font-size: 1.5rem; font-weight: 600; margin-top: .15rem; }
-    .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin-bottom: 1.2rem; overflow-x: auto; }
+    .card {
+        background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+        padding: .9rem 1rem; box-shadow: 0 1px 3px rgba(0,0,0,.4);
+    }
+    .card .label { color: var(--muted); font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; }
+    .card .value { font-size: 1.6rem; font-weight: 700; margin-top: .15rem; }
+    .panel {
+        background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+        padding: 1rem; margin-bottom: 1.2rem; overflow-x: auto; box-shadow: 0 1px 3px rgba(0,0,0,.4);
+    }
     .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; }
     @media (max-width: 800px) { .grid2 { grid-template-columns: 1fr; } }
-    h2 { font-size: .95rem; color: var(--accent); margin: 0 0 .8rem; }
+    h2 { font-size: .95rem; color: var(--fg); font-weight: 600; margin: 0 0 .8rem; }
     table { width: 100%; border-collapse: collapse; font-size: .85rem; }
     th, td { text-align: left; padding: .4rem .5rem; border-bottom: 1px solid var(--border); }
     th { color: var(--muted); font-weight: 500; }
@@ -59,7 +68,7 @@
         background: var(--bg2); color: var(--fg); border: 1px solid var(--border);
         border-radius: 6px; padding: .45rem .6rem; font: inherit;
     }
-    button { cursor: pointer; background: var(--ok); color: var(--bg); border: 0; font-weight: 600; }
+    button { cursor: pointer; background: var(--action); color: #fff; border: 0; font-weight: 600; }
     button:hover { filter: brightness(1.1); }
     a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
         outline: 2px solid var(--s1); outline-offset: 2px; border-radius: 4px;
@@ -68,6 +77,6 @@
     .ok { color: var(--ok); } .warn { color: var(--warn); } .err { color: var(--crit); }
     form.inline { display: flex; gap: .6rem; align-items: end; flex-wrap: wrap; }
     form.inline label { display: flex; flex-direction: column; gap: .2rem; font-size: .8rem; color: var(--muted); }
-    .flash { padding: .6rem 1rem; border-radius: 6px; margin-bottom: 1rem; background: var(--panel); border: 1px solid var(--crit); color: var(--crit); font-weight: 500; }
+    .flash { padding: .6rem 1rem; border-radius: 12px; margin-bottom: 1rem; background: var(--panel); border: 1px solid var(--crit); color: var(--crit); font-weight: 500; }
     .flash.flash-success { border-color: var(--ok); color: var(--ok); }
 </style>

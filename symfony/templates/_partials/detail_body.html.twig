@@ -133,9 +133,9 @@ const M = '{{ metric }}';
 // Paleta validada contra CVD (daltonismo): slots de serie en orden fijo + colores de estado.
 // Misma identidad que en el dashboard: Garmin = slot 1, Móvil = slot 3, fases de sueño 1-4, HRV = slot 1, peso diario = slot 1 / tendencia = slot 3.
 const C = { s1:'#3987e5', s2:'#199e70', s3:'#c98500', s4:'#9085e9', s5:'#e66767',
-            ok:'#0ca30c', warn:'#fab219', crit:'#d03b3b',
-            muted:'#737c73', grid:'#2c2c2a', axis:'#383835', ink:'#c5c9c5', panel:'#282727' };
-Chart.defaults.color = '#c5c9c5'; Chart.defaults.borderColor = C.axis;
+            ok:'#12b76a', warn:'#f7a600', crit:'#ff5c4d',
+            muted:'#8b98a5', grid:'#222a33', axis:'#2a333d', ink:'#dbe4ec', panel:'#1a2129' };
+Chart.defaults.color = '#dbe4ec'; Chart.defaults.borderColor = C.axis;
 Chart.defaults.scale.grid.color = C.grid;
 
 if (M === 'pasos') {

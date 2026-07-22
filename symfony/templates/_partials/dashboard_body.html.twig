@@ -178,8 +178,8 @@
 const S = {{ series|json_encode(constant('JSON_HEX_TAG') b-or constant('JSON_HEX_APOS') b-or constant('JSON_HEX_AMP') b-or constant('JSON_HEX_QUOT'))|raw }};
 // Paleta validada contra CVD (daltonismo): slots de serie en orden fijo + colores de estado.
 const C = { s1:'#3987e5', s2:'#199e70', s3:'#c98500', s4:'#9085e9', s5:'#e66767',
-            ok:'#0ca30c', warn:'#fab219', crit:'#d03b3b',
-            muted:'#737c73', grid:'#2c2c2a', axis:'#383835', fg:'#c5c9c5', ink:'#c5c9c5', panel:'#282727' };
+            ok:'#12b76a', warn:'#f7a600', crit:'#ff5c4d',
+            muted:'#8b98a5', grid:'#222a33', axis:'#2a333d', fg:'#dbe4ec', ink:'#dbe4ec', panel:'#1a2129' };
 Chart.defaults.color = C.fg;
 Chart.defaults.borderColor = C.axis;
 Chart.defaults.scale.grid.color = C.grid;
