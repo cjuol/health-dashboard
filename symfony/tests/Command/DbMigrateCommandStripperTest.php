@@ -49,7 +49,7 @@ final class DbMigrateCommandStripperTest extends TestCase
     public function testRealDbFilesAllHaveTheirBeginAndCommitStripped(): void
     {
         $files = $this->realSqlFiles();
-        self::assertCount(10, $files, 'se esperaban los 10 ficheros db/*.sql del repo');
+        self::assertCount(11, $files, 'se esperaban los 11 ficheros db/*.sql del repo');
 
         foreach ($files as $path) {
             $stripped = $this->strip((string) file_get_contents($path));
