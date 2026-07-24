@@ -1,0 +1,23 @@
+{% extends 'base.html.twig' %}
+{% block title %}Fuerza{% endblock %}
+
+{% block body %}
+<div class="panel">
+    <h2>Sesiones de fuerza recientes</h2>
+    <table>
+        <tr><th>Fecha</th><th>Sesión</th><th>Duración</th><th>Series</th><th></th><th></th></tr>
+        {% for s in sessions %}
+        <tr>
+            <td>{{ s.start_time|date('d/m/Y H:i') }}</td>
+            <td>{{ s.activity_name ?? '—' }}</td>
+            <td>{{ s.duration_s ? (s.duration_s / 60)|round ~ "'" : '—' }}</td>
+            <td>{{ s.set_count }}</td>
+            <td>{% if s.is_edited %}<span class="ok" title="Tiene ediciones manuales">✎ editado</span>{% endif %}</td>
+            <td><a href="{{ path('strength_show', {activityId: s.activity_id}) }}" style="color:var(--link)">Editar</a></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="muted">Todavía no hay sesiones de fuerza registradas.</td></tr>
+        {% endfor %}
+    </table>
+</div>
+{% endblock %}

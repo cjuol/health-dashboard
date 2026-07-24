@@ -419,4 +419,55 @@ final class HealthRepository
 
         return false === $value ? null : (int) $value;
     }
+
+    // -------------------------------------------------------------------------
+    // Editor de fuerza (db/11_strength_overrides.sql)
+    // -------------------------------------------------------------------------
+
+    /** Sesiones de fuerza recientes con nº de series e indicador de edición manual, para el listado del editor. */
+    public function strengthSessions(int $limit = 50): array
+    {
+        return $this->db->fetchAllAssociative(
+            <<<'SQL'
+                SELECT a.activity_id, a.activity_name, a.start_time, a.duration_s,
+                       (SELECT COUNT(*) FROM garmin_strength_set s WHERE s.activity_id = a.activity_id) AS set_count,
+                       (
+                           EXISTS(SELECT 1 FROM strength_set_override o WHERE o.activity_id = a.activity_id)
+                           OR EXISTS(SELECT 1 FROM strength_session_note n WHERE n.activity_id = a.activity_id AND n.notes IS NOT NULL)
+                       ) AS is_edited
+                FROM garmin_activity a
+                WHERE a.is_strength = true
+                ORDER BY a.start_time DESC
+                LIMIT :limit
+                SQL,
+            ['limit' => $limit],
+            ['limit' => ParameterType::INTEGER],
+        );
+    }
+
+    /**
+     * Todas las series (ACTIVE y REST) de una actividad de fuerza, con
+     * valores efectivos (override si existe, si no el de Garmin), los
+     * originales de Garmin y los flags de edición — ver
+     * v_strength_sets_effective. A diferencia de strengthSets(), no filtra
+     * por set_type: el editor necesita también las filas REST.
+     */
+    public function strengthSetsAllEffective(int $activityId): array
+    {
+        return $this->db->fetchAllAssociative(
+            'SELECT * FROM v_strength_sets_effective WHERE activity_id = :id ORDER BY set_order',
+            ['id' => $activityId],
+        );
+    }
+
+    /** Nota de sesión de fuerza guardada por el usuario (o null si no hay ninguna). */
+    public function strengthSessionNote(int $activityId): ?string
+    {
+        $value = $this->db->fetchOne(
+            'SELECT notes FROM strength_session_note WHERE activity_id = :id',
+            ['id' => $activityId],
+        );
+
+        return false === $value ? null : $value;
+    }
 }

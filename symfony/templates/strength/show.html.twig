@@ -1,0 +1,79 @@
+{% extends 'base.html.twig' %}
+{% block title %}{{ a.activity_name }}{% endblock %}
+
+{% block body %}
+<p><a href="{{ path('strength_index') }}" style="color:var(--link)">← Volver a sesiones de fuerza</a></p>
+
+<div class="panel">
+    <h2 style="font-size:1.15rem">🏋 {{ a.activity_name }}
+        <span class="muted" style="font-weight:400; font-size:.85rem">· {{ a.start_time|date('d/m/Y H:i') }}{{ a.duration_s ? ' · ' ~ (a.duration_s / 60)|round ~ "'" }}</span></h2>
+</div>
+
+<div class="panel">
+    <h2>Series</h2>
+    <form id="fuerza-form" method="post" action="{{ path('strength_save', {activityId: a.activity_id}) }}">
+        <input type="hidden" name="_token" value="{{ csrf_token('fuerza_editar') }}">
+        <table>
+            <tr>
+                <th>#</th><th>Ejercicio</th><th>Tipo</th><th>Reps</th><th>Peso (kg)</th>
+                <th>RIR</th><th>RPE</th><th>Notas</th><th></th>
+            </tr>
+            {% for s in sets %}
+            <tr class="{{ s.set_type == 'REST' ? 'muted' }}">
+                <td>{{ s.set_order }}</td>
+                {% if s.set_type == 'ACTIVE' %}
+                <td>
+                    <input type="text" name="sets[{{ s.set_order }}][exercise_name]"
+                           value="{{ s.exercise_name_edited ? s.exercise_name : '' }}"
+                           placeholder="{{ s.garmin_exercise_name ?? '?' }}" maxlength="128">
+                    {% if s.exercise_name_edited %}<div class="muted" style="font-size:.72rem">Garmin: {{ s.garmin_exercise_name ?? '?' }}</div>{% endif %}
+                </td>
+                <td>activa</td>
+                <td>
+                    <input type="number" name="sets[{{ s.set_order }}][reps]" min="0" max="999" step="1" style="width:5.5em"
+                           value="{{ s.reps_edited ? s.reps : '' }}" placeholder="{{ s.garmin_reps ?? '—' }}">
+                    {% if s.reps_edited %}<div class="muted" style="font-size:.72rem">Garmin: {{ s.garmin_reps ?? '—' }}</div>{% endif %}
+                </td>
+                <td>
+                    <input type="text" inputmode="decimal" name="sets[{{ s.set_order }}][weight_kg]" style="width:6em"
+                           value="{{ s.weight_kg_edited ? s.weight_kg : '' }}"
+                           placeholder="{{ s.garmin_weight_kg ?? 'pc' }}">
+                    {% if s.weight_kg_edited %}<div class="muted" style="font-size:.72rem">Garmin: {{ s.garmin_weight_kg ? s.garmin_weight_kg ~ ' kg' : 'corporal' }}</div>{% endif %}
+                </td>
+                <td><input type="text" inputmode="decimal" name="sets[{{ s.set_order }}][rir]" style="width:4em" value="{{ s.rir ?? '' }}"></td>
+                <td><input type="text" inputmode="decimal" name="sets[{{ s.set_order }}][rpe]" style="width:4em" value="{{ s.rpe ?? '' }}"></td>
+                {% else %}
+                <td class="muted">—</td>
+                <td>descanso</td>
+                <td class="muted">—</td>
+                <td class="muted">—</td>
+                <td class="muted">—</td>
+                <td class="muted">—</td>
+                {% endif %}
+                <td><input type="text" name="sets[{{ s.set_order }}][notes]" style="width:12em" value="{{ s.notes ?? '' }}"></td>
+                <td>
+                    {% if s.is_edited %}
+                    <button type="submit" formaction="{{ path('strength_set_revert', {activityId: a.activity_id, setOrder: s.set_order}) }}" style="background:var(--crit)">Revertir</button>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="9" class="muted">Sin series registradas.</td></tr>
+            {% endfor %}
+        </table>
+
+        <div style="margin-top:1rem">
+            <label style="display:flex; flex-direction:column; gap:.2rem; font-size:.8rem; color:var(--muted)">
+                Notas de la sesión
+                <textarea name="session_notes" rows="3" style="width:100%">{{ session_notes ?? '' }}</textarea>
+            </label>
+        </div>
+
+        <button type="submit" style="margin-top:1rem">Guardar cambios</button>
+    </form>
+    <p class="muted" style="margin-bottom:0; margin-top:.8rem; font-size:.78rem">
+        Dejar un campo vacío usa el valor de Garmin (mostrado como referencia). Un valor igual al de Garmin no se guarda como edición.
+        RIR = repeticiones en reserva, RPE = esfuerzo percibido (0–10).
+    </p>
+</div>
+{% endblock %}
